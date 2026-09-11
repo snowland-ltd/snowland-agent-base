@@ -1,0 +1,24 @@
+# Byte-compiled / cache
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+
+# Vector store (runtime data)
+chroma_store/
+
+# Virtualenv
+.venv/
+venv/
+
+# IDE
+.idea/*
+!.idea/workspace.xml
+
+# Env / secrets
+.env
+
+# Temp
+_*.txt
+tmp_*

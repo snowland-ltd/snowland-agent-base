@@ -1,0 +1,37 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "snowland-agent-base"
+# 版本从 snowland_agent_base/__init__.py 的 __version__ 动态读取 (见下方 [tool.setuptools.dynamic])
+dynamic = ["version"]
+description = "A reusable AI Agent base framework built on LangChain + DashScope + ChromaDB"
+readme = "README.md"
+requires-python = ">=3.9"
+license = "Apache-2.0"
+license-files = ["LICENSE"]
+dependencies = [
+    "langchain-core>=0.2.0",
+    "langchain-dashscope>=0.1.0",
+    "langchain-chroma>=0.1.0",
+    "dashscope>=1.20.0",
+    "chromadb>=0.5.0",
+    "spacy>=3.7.0",
+    "snowland-http>=0.1.0",
+]
+
+[project.optional-dependencies]
+# 图编排: pip install -e ".[graph]"
+graph = [
+    "langgraph>=1.0.0",
+    "langgraph-checkpoint-sqlite>=2.0.0",
+]
+
+[tool.setuptools.dynamic]
+# 单一版本源: 只需修改 snowland_agent_base/__init__.py 中的 __version__
+version = { attr = "snowland_agent_base.__version__" }
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["snowland_agent_base*"]

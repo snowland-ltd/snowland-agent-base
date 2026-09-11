@@ -1,0 +1,17 @@
+# Development dependencies
+#
+# 安装: pip install -r requirements-dev.txt
+# 测试基于 Python 标准库 unittest, 无需 pytest。
+
+-r requirements.txt
+
+# ---- 打包与发布 ----
+build>=1.0.0
+twine>=5.0.0
+
+# ---- HTTP 后端 (httpx 推荐, 同步+异步) ----
+httpx>=0.27.0
+
+# ---- 可选: 图编排 (GraphAgent 测试需要) ----
+langgraph>=1.0.0
+langgraph-checkpoint-sqlite>=2.0.0

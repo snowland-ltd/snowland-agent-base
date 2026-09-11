@@ -1,0 +1,31 @@
+# snowland-agent-base runtime dependencies
+#
+# 安装: pip install -r requirements.txt
+# 安装后需下载 spaCy 中文模型:
+#     python -m spacy download zh_core_web_sm
+
+# ---- 核心框架 (LangChain) ----
+langchain-core>=0.2.0
+
+# ---- 大模型接入 (阿里云百炼 / DashScope) ----
+langchain-dashscope>=0.1.0
+dashscope>=1.20.0
+
+# ---- 记忆存储 (ChromaDB 向量知识库) ----
+chromadb>=0.5.0
+langchain-chroma>=0.1.0
+
+# ---- 感知层 (spaCy 实体识别 / 意图分类) ----
+spacy>=3.7.0
+
+# ---- 执行层 (HTTP 客户端, 统一超时与重试) ----
+# 可选后端: pip install "snowland-http[httpx]"  (推荐, 同步+异步)
+#           pip install "snowland-http[requests]"
+#           pip install "snowland-http[aiohttp]"
+snowland-http>=0.1.0
+
+# ---- 可选: 图编排 (GraphAgent / 持久化 / 人机介入 / 流式 / 子图) ----
+# 不装也能用 BaseAgent; 要使用 GraphAgent 则需安装:
+#     pip install langgraph langgraph-checkpoint-sqlite
+# langgraph>=1.0.0
+# langgraph-checkpoint-sqlite>=2.0.0
