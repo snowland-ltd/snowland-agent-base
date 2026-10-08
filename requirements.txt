@@ -11,6 +11,12 @@ langchain-core>=0.2.0
 langchain-dashscope>=0.1.0
 dashscope>=1.20.0
 
+# ---- 大模型接入 (OpenAI 兼容: OrcaRouter / 智谱 / DeepSeek) ----
+langchain-openai>=0.1.0
+
+# ---- 大模型接入 (Anthropic 原生 Messages API) ----
+langchain-anthropic>=0.1.0
+
 # ---- 记忆存储 (ChromaDB 向量知识库) ----
 chromadb>=0.5.0
 langchain-chroma>=0.1.0

@@ -18,6 +18,13 @@ from __future__ import annotations
 from typing import Dict
 
 from snowland_agent_base.llm.backends.dashscope import DashScopeLLMBackend
+from snowland_agent_base.llm.backends.deepseek import DeepSeekLLMBackend
+from snowland_agent_base.llm.backends.orcarouter import OrcaRouterLLMBackend
+from snowland_agent_base.llm.backends.zhipu import ZhipuLLMBackend
+from snowland_agent_base.llm.backends.anthropic import AnthropicLLMBackend
+from snowland_agent_base.llm.backends.anthropic_openai import (
+    AnthropicOpenAILLMBackend,
+)
 from snowland_agent_base.llm.base import LLMBackend
 
 
@@ -48,6 +55,20 @@ def create_llm_backend(name: str = "dashscope", **kwargs) -> LLMBackend:
     return get_llm_backend(name)(**kwargs)
 
 
-# 注册内置后端 ("bailian" 作为 "dashscope" 的别名)
+# 注册内置后端
+# 阿里云百炼 (DashScope) / 通义千问 (Qwen)
 register_llm_backend("dashscope", DashScopeLLMBackend)
 register_llm_backend("bailian", DashScopeLLMBackend)
+register_llm_backend("qwen", DashScopeLLMBackend)
+register_llm_backend("qianwen", DashScopeLLMBackend)
+# OrcaRouter (OpenAI 兼容路由服务)
+register_llm_backend("orcarouter", OrcaRouterLLMBackend)
+# 智谱 AI (BigModel / GLM), OpenAI 兼容
+register_llm_backend("zhipu", ZhipuLLMBackend)
+# DeepSeek, OpenAI 兼容
+register_llm_backend("deepseek", DeepSeekLLMBackend)
+# Anthropic 原生 Messages API
+register_llm_backend("anthropic", AnthropicLLMBackend)
+# Anthropic OpenAI 兼容接口
+register_llm_backend("anthropic-openai", AnthropicOpenAILLMBackend)
+register_llm_backend("anthropic-compatible", AnthropicOpenAILLMBackend)
