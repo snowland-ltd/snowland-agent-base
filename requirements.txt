@@ -25,7 +25,6 @@ spacy>=3.7.0
 snowland-http>=0.1.0
 
 # ---- 可选: 图编排 (GraphAgent / 持久化 / 人机介入 / 流式 / 子图) ----
-# 不装也能用 BaseAgent; 要使用 GraphAgent 则需安装:
-#     pip install langgraph langgraph-checkpoint-sqlite
-# langgraph>=1.0.0
-# langgraph-checkpoint-sqlite>=2.0.0
+# 仅 GraphAgent 需要, BaseAgent 不依赖; 也可用 pyproject extra 安装: pip install "snowland-agent-base[graph]"
+langgraph>=1.0.0
+langgraph-checkpoint-sqlite>=2.0.0

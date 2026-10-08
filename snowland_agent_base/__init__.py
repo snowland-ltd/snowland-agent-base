@@ -21,40 +21,34 @@
 - 感知层: 可插拔后端 (spaCy / 阿里百炼 DashScope 等)
 - 决策层: LLM 链式思考 + 规则引擎兜底
 - 执行层: snowland-http 封装外部 API (超时 / 重试)
+- 能力层: 可插拔 skill (来源后端 + 召回策略, 内置 file/memory 与 IDF 召回)
+
+本模块只暴露**稳定的公共 API**(主入口门面 + 供扩展的抽象基类 + 消息模型)。
+具体后端实现与注册/工厂函数请从其子模块导入, 例如::
+
+    from snowland_agent_base.llm import DashScopeLLMBackend, register_llm_backend
+    from snowland_agent_base.memory import ChromaMemoryBackend
+    from snowland_agent_base.skill import FileSkillBackend, IdfSkillMatcher
 """
 
 
+# ---- 主入口 / 代理 ----
 from snowland_agent_base.agent import BaseAgent
-from snowland_agent_base.memory import (
-    ChromaMemoryBackend,
-    MemoryBackend,
-    VectorMemory,
-    create_memory_backend,
-    get_memory_backend,
-    list_memory_backends,
-    register_memory_backend,
-)
-from snowland_agent_base.perception import (
-    BailianPerceptionBackend,
-    PerceptionBackend,
-    PerceptionLayer,
-    create_perception_backend,
-    get_perception_backend,
-    list_perception_backends,
-    register_perception_backend,
-    SpacyPerceptionBackend,
-)
+
+# ---- 大模型接入层 (门面 + 抽象基类) ----
+from snowland_agent_base.llm import LLMBackend, build_llm
+
+# ---- 记忆层 (门面 + 抽象基类) ----
+from snowland_agent_base.memory import MemoryBackend, VectorMemory
+
+# ---- 感知层 (门面 + 抽象基类) ----
+from snowland_agent_base.perception import PerceptionBackend, PerceptionLayer
+
+# ---- 决策 / 执行层 ----
 from snowland_agent_base.decision import DecisionLayer
 from snowland_agent_base.execution import ToolExecutor
-from snowland_agent_base.llm import (
-    DashScopeLLMBackend,
-    LLMBackend,
-    build_llm,
-    create_llm_backend,
-    get_llm_backend,
-    list_llm_backends,
-    register_llm_backend,
-)
+
+# ---- 消息模型与构造器 ----
 from snowland_agent_base.messages import (
     Message,
     assistant_message,
@@ -63,9 +57,12 @@ from snowland_agent_base.messages import (
     user_message,
 )
 
+# ---- 能力层 skill (门面 + 模型 + 抽象基类 + 装饰器/工具) ----
 from snowland_agent_base.skill import (
     Skill,
+    SkillBackend,
     SkillError,
+    SkillMatcher,
     SkillRegistry,
     parse_skill_file,
     skill,
@@ -73,40 +70,32 @@ from snowland_agent_base.skill import (
 
 __all__ = [
     "BaseAgent",
-    "VectorMemory",
-    "MemoryBackend",
-    "ChromaMemoryBackend",
-    "register_memory_backend",
-    "get_memory_backend",
-    "list_memory_backends",
-    "create_memory_backend",
-    "PerceptionLayer",
-    "PerceptionBackend",
-    "SpacyPerceptionBackend",
-    "BailianPerceptionBackend",
-    "register_perception_backend",
-    "get_perception_backend",
-    "list_perception_backends",
-    "create_perception_backend",
-    "DecisionLayer",
-    "ToolExecutor",
+    # llm
     "build_llm",
     "LLMBackend",
-    "DashScopeLLMBackend",
-    "register_llm_backend",
-    "get_llm_backend",
-    "list_llm_backends",
-    "create_llm_backend",
-    "Skill",
-    "SkillRegistry",
-    "SkillError",
-    "skill",
-    "parse_skill_file",
+    # memory
+    "VectorMemory",
+    "MemoryBackend",
+    # perception
+    "PerceptionLayer",
+    "PerceptionBackend",
+    # decision / execution
+    "DecisionLayer",
+    "ToolExecutor",
+    # messages
     "Message",
     "system_message",
     "user_message",
     "assistant_message",
     "tool_message",
+    # skill
+    "Skill",
+    "SkillError",
+    "SkillBackend",
+    "SkillMatcher",
+    "SkillRegistry",
+    "skill",
+    "parse_skill_file",
 ]
 
 # GraphAgent 依赖可选的 langgraph, 未安装时不阻断本包导入
@@ -118,4 +107,4 @@ except ImportError:  # pragma: no cover
     GraphAgent = None  # type: ignore[assignment]
 
 
-__version__ = "0.1.0alpha1"
+__version__ = "0.1.0beta2"

@@ -1,62 +1,75 @@
 # snowland-agent-base
 
-一个可复用的 **AI Agent 基类**框架，按「感知 → 决策 → 执行 → 记忆」分层设计，基于 LangChain 生态搭建。
+> 中文版: [README.md](README_zh.md)
 
-## 技术选型
+A reusable **AI Agent base class** framework, designed with a layered
+"Perception → Decision → Execution → Memory" architecture and built on the
+LangChain ecosystem.
 
-| 层次 | 方案 | 说明 |
+## Tech Stack
+
+| Layer | Solution | Description |
 | --- | --- | --- |
-| 核心框架 | LangChain | 内置记忆、工具调用等封装，减少重复开发 |
-| 大模型接入 | 阿里云百炼 (DashScope) | 云端服务，无需本地部署与模型运维 |
-| 记忆存储 | ChromaDB | 向量知识库，长期记忆语义检索，本地持久化 |
-| 感知层 | spaCy | 实体识别、意图分类，无需从零开发 NLP |
-| 决策层 | LLM 链式思考 + 规则引擎 | CoT 拆解复杂任务，规则兜底保证稳定性 |
-| 执行层 | snowland-http | 统一超时、重试，快速对接外部 API |
+| Core framework | LangChain | Built-in memory, tool-calling wrappers, reducing duplicate development |
+| LLM integration | Alibaba Cloud Bailian (DashScope) | Cloud service, no local deployment or model O&M |
+| Memory storage | ChromaDB | Vector knowledge base, long-term semantic retrieval, local persistence |
+| Perception layer | spaCy | Entity recognition, intent classification, no need to build NLP from scratch |
+| Decision layer | LLM chain-of-thought + rule engine | CoT decomposes complex tasks; rules guarantee stability as fallback |
+| Execution layer | snowland-http | Unified timeout/retry, fast integration with external APIs |
 
-## 架构
+## Architecture
 
 ```
-用户输入
+User input
    │
    ▼
-┌──────────────┐   实体/意图
-│  感知层       │──────────────┐
-│ PerceptionLayer│             │
+┌──────────────┐   entity/intent
+│ Perception   │──────────────┐
+│ Layer        │             │
 └──────────────┘             ▼
                      ┌──────────────┐
-┌──────────────┐     │  决策层       │  规则命中 → 直接输出
-│  记忆层       │────▶│ DecisionLayer│  否则 → LLM 链式思考
-│ VectorMemory │ 检索 └──────┬───────┘
-└──────────────┘            │ 动作
+┌──────────────┐     │  Decision    │  rule hit → output directly
+│  Memory      │────▶│  Layer       │  otherwise → LLM chain-of-thought
+│  Layer       │retrieve└──────┬─────┘
+└──────────────┘            │ action
         ▲                   ▼
         │            ┌──────────────┐
-        └────────────│  执行层       │ 超时/重试/异常收敛
-          写回记忆    │ ToolExecutor │
+        └────────────│  Execution   │  timeout/retry/exception handling
+           write back│  Layer       │
+              memory │  ToolExecutor │
                      └──────────────┘
 ```
 
-`BaseAgent.run()` 将上述流程串成 ReAct 风格循环，受 `max_steps` 限制防止死循环。
+`BaseAgent.run()` chains the above into a ReAct-style loop, bounded by `max_steps`
+to prevent infinite loops.
 
-## 安装
+## Installation
+
+This package is installed and used as a **published distribution (wheel)**, imported
+from PyPI. **Editable (`-e`) installation is not supported.**
 
 ```bash
-# 方式一: 从 requirements 安装
-pip install -r requirements.txt
+# Method 1: Install from PyPI (recommended; import source is PyPI)
+pip install snowland-agent-base
 
-# 方式二: 可编辑安装 (会读取 pyproject.toml 依赖)
-pip install -e .
+# Optional dependencies (install as needed)
+pip install "snowland-agent-base[graph]"   # langgraph deps required by GraphAgent
+pip install "snowland-http[httpx]"         # recommended HTTP backend for the execution layer
 
-# 下载 spaCy 中文模型 (感知层需要)
+# Method 2: Build the wheel locally then install normally (pre-release self-test, not editable)
+python -m build --wheel        # generates dist/*.whl
+pip install dist/*.whl         # normal install, imported from site-packages, without -e
+```
+
+`snowland-http` requires an HTTP backend; httpx is recommended.
+
+Download the spaCy Chinese model (required by the spaCy backend in the perception layer):
+
+```bash
 python -m spacy download zh_core_web_sm
 ```
 
-`snowland-http` 需搭配一个 HTTP 后端使用，推荐 httpx：
-
-```bash
-pip install "snowland-http[httpx]"
-```
-
-配置百炼 API Key：
+Configure the Bailian API Key:
 
 ```bash
 # Windows
@@ -65,7 +78,7 @@ set DASHSCOPE_API_KEY=sk-xxxxxx
 export DASHSCOPE_API_KEY=sk-xxxxxx
 ```
 
-## 快速使用
+## Quick Start
 
 ```python
 from langchain_dashscope import DashScopeEmbeddings
@@ -78,143 +91,159 @@ llm = build_llm(model="qwen-plus")
 agent = BaseAgent(
     llm=llm,
     embedding=DashScopeEmbeddings(model="text-embedding-v2"),
-    system_prompt="你是一个专业的电商客服助手, 语气友好简洁。",
+    system_prompt="You are a professional e-commerce customer service assistant, friendly and concise.",
 )
 
-# 注册工具
+# Register a tool
 agent.register_tool("calculator", lambda expression: eval(expression))
 
-# 规则兜底（命中则不调用大模型）
+# Rule-based fallback (no LLM call when matched)
 agent.add_rule(Rule(
     name="greeting",
     predicate=lambda text, ctx: ctx.get("intent") == "greeting",
-    action=AgentAction(final_answer="你好，有什么可以帮您？"),
+    action=AgentAction(final_answer="Hello, how can I help you?"),
 ))
 
-result = agent.run("1 + 2 等于几？")
+result = agent.run("What is 1 + 2?")
 print(result["answer"])
 ```
 
-完整示例见 `examples/quickstart.py`。
+Full example: `examples/quickstart.py`.
 
-## 消息模型
+## Message Model
 
-历史会话与 Agent 输出均使用 **消息列表**（`List[Message]`），而非拼接的字符串 —— 这样能保留角色结构，便于持久化、多轮对话和前端渲染。
+Both conversation history and Agent output use a **message list** (`List[Message]`)
+rather than concatenated strings — this preserves role structure, facilitating
+persistence, multi-turn dialogue, and frontend rendering.
 
 ```python
 from snowland_agent_base import user_message, assistant_message
 
-result = agent.run("北京天气怎么样？")
+result = agent.run("What's the weather like in Beijing?")
 
-result["answer"]     # "北京今天晴，25℃"  —— 最终答复文本
-result["messages"]   # 完整对话轨迹：
+result["answer"]     # "Beijing is sunny today, 25°C"  —— final answer text
+result["messages"]   # full conversation trace:
 # [
-#   {"role": "user",      "content": "北京天气怎么样？"},
-#   {"role": "tool",      "content": "调用成功: 晴，25℃", "name": "get_weather"},
-#   {"role": "assistant", "content": "北京今天晴，25℃"},
+#   {"role": "user",      "content": "What's the weather like in Beijing?"},
+#   {"role": "tool",      "content": "Call succeeded: sunny, 25°C", "name": "get_weather"},
+#   {"role": "assistant", "content": "Beijing is sunny today, 25°C"},
 # ]
 ```
 
-`Message` 结构为 `{"role": ..., "content": ...}`，`role` 取值 `system` / `user` / `assistant` / `tool`（`tool` 消息带 `name` 字段标识工具名）。
+The `Message` structure is `{"role": ..., "content": ...}`, with `role` being one of
+`system` / `user` / `assistant` / `tool` (a `tool` message carries a `name` field
+identifying the tool).
 
-历史会以**独立消息**参与多轮对话传给模型，而不是塞进系统提示词，更符合 LLM 的对话范式。
+History participates in multi-turn dialogue as **independent messages** passed to the
+model, rather than being stuffed into the system prompt, which better fits the LLM
+conversation paradigm.
 
-`GraphAgent` 还支持把上一轮的 `messages` 直接作为下一轮的历史传入，实现自行托管的多轮对话：
+`GraphAgent` also supports passing the previous round's `messages` directly as the next
+round's history, enabling self-managed multi-turn dialogue:
 
 ```python
 history = []
-for question in ["我叫小明", "我叫什么名字？"]:
+for question in ["My name is Xiao Ming", "What is my name?"]:
     result = agent.invoke(question, thread_id="multi", history=history)
-    history = result["messages"]   # 累积完整轨迹，带入下一轮
+    history = result["messages"]   # accumulate the full trace, bring into the next round
 ```
 
-若不传 `history`，也可用 `thread_id` 让 checkpointer 自动恢复状态；两者可同时使用。
+If `history` is not passed, you can also use `thread_id` to let the checkpointer
+automatically restore state; both can be used together.
 
 ## Skill
 
-Skill 用于沉淀领域知识、SOP 和复杂工作流，遵循 [Agent Skills 规范](https://agentskills.io/specification)，采用**渐进式披露**分三级加载，避免一次性占满上下文：
+Skills are used to distill domain knowledge, SOPs, and complex workflows, following the
+[Agent Skills specification](https://agentskills.io/specification). They use
+**progressive disclosure** with three levels of loading to avoid filling the context all
+at once:
 
-| 级别 | 加载时机 | 内容 |
+| Level | Loaded when | Content |
 | --- | --- | --- |
-| 1. 元数据 | 启动时 | 仅 `name` + `description`（~100 tokens/skill），供模型判断相关性 |
-| 2. 指令 | 激活时 | 完整 `SKILL.md` 正文，注入系统提示词 |
-| 3. 资源 | 按需 | `scripts/` `references/` `assets/` 下的文件，需要时才读 |
+| 1. Metadata | At startup | Only `name` + `description` (~100 tokens/skill), for the model to judge relevance |
+| 2. Instructions | On activation | Full `SKILL.md` body, injected into the system prompt |
+| 3. Resources | On demand | Files under `scripts/` `references/` `assets/`, read only when needed |
 
-支持两种形态：**指令型**（SOP/领域知识）与**工具包型**（携带自己的工具集，激活后工具可用）。
+Two forms are supported: **instruction-type** (SOP/domain knowledge) and
+**toolkit-type** (carries its own toolset, tools become available after activation).
 
-### 代码注册
+### Register in code
 
 ```python
 from snowland_agent_base import skill
 
 agent.add_skill(skill(
     name="order-support",
-    description="查询订单状态、办理退款。当用户提到订单、物流、退款时使用。",
-    instructions="## 流程\n1. 先确认订单号...",
-    tools={"get_order_status": get_order_status, "refund": refund},  # 工具包型
+    description="Query order status, process refunds. Use when the user mentions orders, shipping, or refunds.",
+    instructions="## Flow\n1. Confirm the order number first...",
+    tools={"get_order_status": get_order_status, "refund": refund},  # toolkit-type
 ))
 ```
 
-### 目录扫描
+### Directory scanning
 
 ```
 skills/
 └── pdf-processing/
-    ├── SKILL.md              # 必需
-    ├── scripts/              # 可选
-    ├── references/           # 可选
-    └── assets/               # 可选
+    ├── SKILL.md              # required
+    ├── scripts/              # optional
+    ├── references/           # optional
+    └── assets/               # optional
 ```
 
-`SKILL.md` 格式（`name` / `description` 必填）：
+`SKILL.md` format (`name` / `description` required):
 
 ```markdown
 ---
 name: pdf-processing
-description: 提取 PDF 文本与表格。当用户提到 PDF、表单、文档抽取时使用。
+description: Extract text and tables from PDFs. Use when the user mentions PDF, forms, or document extraction.
 metadata:
   author: snowland
 ---
 
-## 标准流程
-1. 确认用户意图...
+## Standard Flow
+1. Confirm the user's intent...
 ```
 
 ```python
-agent.load_skills("./skills")   # 自动发现含 SKILL.md 的子目录
+agent.load_skills("./skills")   # auto-discover subdirectories containing SKILL.md
 ```
 
-### 激活与观测
+### Activation and observation
 
-默认按输入做词面粗筛自动激活；最终「用不用」由 LLM 依据目录判断。
+By default, keyword-based coarse filtering on the input auto-activates skills; the final
+"whether to use" is decided by the LLM based on the catalog.
 
 ```python
-result = agent.run("帮我提取 PDF 的表格")
-result["skills"]   # ['pdf-processing']  —— 本轮激活的 skill
+result = agent.run("Extract the tables from this PDF")
+result["skills"]   # ['pdf-processing']  —— skills activated this round
 ```
 
-关闭自动激活（仅注入目录，完全交给 LLM 判断）：
+Disable auto-activation (inject the catalog only, leave it entirely to the LLM):
 
 ```python
 agent = BaseAgent(llm=llm, skills=registry, auto_activate_skills=False)
 ```
 
-完整示例见 `examples/skill_demo.py` 与 `examples/skills/`。
+Full examples: `examples/skill_demo.py` and `examples/skills/`.
 
-## 两种 Agent 实现
+## Two Agent Implementations
 
-| | `BaseAgent`（默认） | `GraphAgent`（需 langgraph） |
+| | `BaseAgent` (default) | `GraphAgent` (requires langgraph) |
 | --- | --- | --- |
-| 编排方式 | 手写 ReAct 循环 | LangGraph `StateGraph` |
-| 持久化 / 断点续跑 | 不支持 | checkpointer（Memory / SQLite / Postgres） |
-| 人机介入 | 不支持 | `interrupt` 原生支持 |
-| 流式输出 | 阻塞返回 | `stream_events` v3（messages / values / interrupts） |
-| 多 Agent | 不支持 | 子图 / supervisor 模式 |
-| 依赖 | 仅基础依赖 | 额外 `langgraph` |
+| Orchestration | Hand-written ReAct loop | LangGraph `StateGraph` |
+| Persistence / resumability | Not supported | checkpointer (Memory / SQLite / Postgres) |
+| Human-in-the-loop | Not supported | `interrupt` native support |
+| Streaming | Blocking return | `stream_events` v3 (messages / values / interrupts) |
+| Multi-Agent | Not supported | subgraph / supervisor pattern |
+| Dependencies | base dependencies only | additional `langgraph` |
 
-两者**接口一致、可并存**，四层（感知/决策/执行/记忆）完全复用。简单场景用 `BaseAgent`，需要持久化、审批、流式或多 Agent 时用 `GraphAgent`。
+The two have **consistent interfaces and can coexist**, with the four layers
+(perception/decision/execution/memory) fully reused. Use `BaseAgent` for simple
+scenarios, and `GraphAgent` when you need persistence, approval, streaming, or
+multi-agent orchestration.
 
-### GraphAgent 用法
+### GraphAgent usage
 
 ```bash
 pip install langgraph langgraph-checkpoint-sqlite
@@ -230,75 +259,82 @@ agent = GraphAgent(
     llm=llm,
     embedding=embedding,
     checkpointer=SqliteSaver(sqlite3.connect("agent.db", check_same_thread=False)),
-    approval_tools=["delete_order", "refund"],  # 这些工具执行前需人工审批
+    approval_tools=["delete_order", "refund"],  # these tools pause for approval before execution
 )
 agent.register_tool("delete_order", delete_order)
 
-# 普通调用（同一 thread_id 可断点续跑）
-result = agent.invoke("你好", thread_id="session-1")
+# Normal invocation (same thread_id can resume from a breakpoint)
+result = agent.invoke("Hello", thread_id="session-1")
 
-# 显式传入历史会话（自行管理会话存储时用；亦可与 thread_id 并存）
+# Explicitly pass conversation history (for self-managed session storage; can also coexist with thread_id)
 result = agent.invoke(
-    "我叫什么名字？",
+    "What is my name?",
     thread_id="session-1",
     history=[
-        {"role": "user", "content": "我叫小明"},
-        {"role": "assistant", "content": "你好，小明！"},
+        {"role": "user", "content": "My name is Xiao Ming"},
+        {"role": "assistant", "content": "Hello, Xiao Ming!"},
     ],
 )
 
-# 人机介入：危险工具执行前暂停
-stream = agent.stream_events("删除订单 12345", thread_id="session-1")
-_ = stream.output                      # 驱动执行到中断点
+# Human-in-the-loop: pause before executing dangerous tools
+stream = agent.stream_events("Delete order 12345", thread_id="session-1")
+_ = stream.output                      # drive execution up to the interrupt point
 if stream.interrupted:
-    print(stream.interrupts[0].value)  # 待审批内容
-    # 批准（亦可传 {"approved": True, "tool_input": {...}} 改写入参）
+    print(stream.interrupts[0].value)  # content pending approval
+    # Approve (or pass {"approved": True, "tool_input": {...}} to rewrite the input)
     stream = agent.resume(True, thread_id="session-1")
     print(stream.output["answer"])
 
-# 流式输出
-for chunk in agent.stream("介绍一下你自己", thread_id="s2", stream_mode="updates"):
+# Streaming output
+for chunk in agent.stream("Introduce yourself", thread_id="s2", stream_mode="updates"):
     print(chunk)
 
-# 子图编排：把专用 Agent 注册为「工具」
+# Subgraph orchestration: register a dedicated Agent as a "tool"
 agent.add_subgraph("translator", translator_agent.build())
 ```
 
-完整示例见 `examples/graph_demo.py`。
+Full example: `examples/graph_demo.py`.
 
-**实现要点**：`interrupt` 靠抛异常实现，因此审批逻辑独立成 `approval` 节点且置于工具执行之前，避免被 `ToolExecutor` 的 `except Exception` 吞掉；节点重跑时从开头执行，故所有 state 更新均为「基于旧值重算」的覆盖式写法以保证幂等。
+**Implementation notes**: `interrupt` is implemented by raising an exception, so the
+approval logic is isolated into an `approval` node placed before tool execution to avoid
+being swallowed by `ToolExecutor`'s `except Exception`; nodes re-run from the beginning,
+so all state updates use "recompute based on old value" overwrite-style writes to ensure
+idempotency.
 
-## 扩展点
+## Extension Points
 
-继承 `BaseAgent` 即可定制业务 Agent，无需改动主循环：
+Inherit `BaseAgent` to customize a business Agent without modifying the main loop:
 
-- **加工具**：`agent.register_tool(name, func)`，由执行层统一处理超时与重试。
-- **加规则**：`agent.add_rule(Rule(...))`，用于稳定输出的确定性兜底。
-- **注入业务上下文**：覆盖 `_build_prompt_context()`，把用户画像、会话状态等传给决策层。
-- **定义角色人设**：构造时传 `system_prompt="..."`；需按请求动态生成时覆盖 `_build_system_prompt()`：
+- **Add tools**: `agent.register_tool(name, func)`, with unified timeout and retry handled by the execution layer.
+- **Add rules**: `agent.add_rule(Rule(...))`, for deterministic fallback of stable outputs.
+- **Inject business context**: override `_build_prompt_context()` to pass user profiles, session state, etc. to the decision layer.
+- **Define role persona**: pass `system_prompt="..."` at construction; override `_build_system_prompt()` when it needs to be generated dynamically per request:
 
   ```python
   class MyAgent(BaseAgent):
       def _build_system_prompt(self, user_input, perception_result):
-          return f"当前时间 {now()}，请用中文回答。用户问题：{user_input}"
+          return f"Current time {now()}, please answer in Chinese. User question: {user_input}"
   ```
 
-  > 注意：若同时传入 `decision=` 和 `system_prompt=`，后者会被忽略（决策层已自带人设），此时应在 `DecisionLayer(system_prompt=...)` 上设置。
+  > Note: If both `decision=` and `system_prompt=` are passed, the latter is ignored (the decision layer already has its own persona); in that case set it on `DecisionLayer(system_prompt=...)`.
 
-单项能力也可独立替换（依赖注入）：`perception` / `decision` / `executor` / `memory` 均可在构造时传入自定义实现。
+Individual capabilities can also be replaced independently (dependency injection):
+`perception` / `decision` / `executor` / `memory` can all be passed as custom
+implementations at construction.
 
-## 降级策略
+## Degradation Strategy
 
-各层故障均不阻断主流程，自动降级：
+Failures at any layer do not block the main flow and degrade automatically:
 
-- 感知层（spaCy 模型缺失）→ 返回 `None`，决策走默认意图。
-- 记忆层（Chroma 不可用）→ 检索/写入忽略，退化为无记忆模式。
-- 决策层（LLM 异常或返回非法 JSON）→ 重试后回退 `fallback_answer`。
-- 执行层（工具抛错/超时）→ 指数退避重试，最终收敛为 `success=False` 的观测结果。
+- Perception layer (spaCy model missing) → returns `None`, decision uses default intent.
+- Memory layer (Chroma unavailable) → retrieval/writing ignored, degrades to memory-less mode.
+- Decision layer (LLM exception or invalid JSON) → retry then fall back to `fallback_answer`.
+- Execution layer (tool throws/times out) → exponential backoff retry, eventually converging to an observation with `success=False`.
 
-## 测试
+## Testing
 
-测试基于 Python 标准库 `unittest`，使用 `FakeChatModel` / `FakeEmbeddings` 替代外部依赖，**无需联网**：
+Tests are based on Python's standard library `unittest`, using `FakeChatModel` /
+`FakeEmbeddings` to replace external dependencies, **no network required**:
 
 ```bash
 python -m unittest discover -s tests -t .

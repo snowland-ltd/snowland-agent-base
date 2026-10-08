@@ -20,6 +20,11 @@
     python -m spacy download zh_core_web_sm
     set DASHSCOPE_API_KEY=sk-xxxxxx
 """
+# langchain-dashscope 0.1.8 仍 import 已被移除的 langchain_core.pydantic_v1;
+# 在导入它之前注入 pydantic.v1 兼容 shim (不改动任何已安装包)。
+from snowland_agent_base._compat import ensure_pydantic_v1_shim
+
+ensure_pydantic_v1_shim()
 from langchain_dashscope import DashScopeEmbeddings
 from langgraph.checkpoint.sqlite import SqliteSaver
 
