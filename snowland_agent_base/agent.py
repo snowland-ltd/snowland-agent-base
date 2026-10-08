@@ -67,6 +67,7 @@ class BaseAgent:
         system_prompt: Optional[str] = None,
         skills: Optional[SkillRegistry] = None,
         auto_activate_skills: bool = True,
+        backend: Optional[str] = None,
     ) -> None:
         """初始化 Agent。
 
@@ -92,6 +93,8 @@ class BaseAgent:
         self.use_perception = use_perception
         self.use_memory = use_memory and embedding is not None
         self._system_prompt = system_prompt
+        # 后端名称 (如 "anthropic"): 透传给决策层, 用于消息原生 tool use 转换
+        self._backend = backend
 
         self.skills = skills or SkillRegistry()
         self.auto_activate_skills = auto_activate_skills
@@ -254,6 +257,7 @@ class BaseAgent:
                 context=context,
                 system_prompt=system_prompt,
                 skills=active_skills,
+                backend=self._backend,
             )
             logger.debug("step %s -> %s", step, action.to_dict())
 
