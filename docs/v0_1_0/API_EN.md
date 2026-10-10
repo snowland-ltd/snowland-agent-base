@@ -7,15 +7,32 @@
 ```python
 import snowland_agent_base as sab
 # or import by name:
-from snowland_agent_base import BaseAgent, GraphAgent, build_llm, VectorMemory, PerceptionLayer, SkillRegistry
+from snowland_agent_base import (
+    BaseAgent,
+    GraphAgent,
+    build_llm,
+    VectorMemory,
+    PerceptionLayer,
+    SkillRegistry,
+    Message,
+    OpenAIMessage,
+    AnthropicMessage,
+)
 ```
 
-Concrete backend implementations (`DashScopeLLMBackend`, `ChromaMemoryBackend`,
-`SpacyPerceptionBackend`, `FileSkillBackend`, `IdfSkillMatcher`, ...) and the registration /
-factory functions should be imported from their submodules:
+Concrete backend implementations (`DashScopeLLMBackend`, `OpenAICompatLLMBackend`,
+`AnthropicLLMBackend`, `ChromaMemoryBackend`, `SpacyPerceptionBackend`, `FileSkillBackend`,
+`IdfSkillMatcher`, ...) and the registration / factory functions (`register_llm_backend`,
+`get_message_class`, ...) should be imported from their submodules:
 
 ```python
-from snowland_agent_base.llm import DashScopeLLMBackend, register_llm_backend
+from snowland_agent_base.llm import (
+    DashScopeLLMBackend,
+    AnthropicLLMBackend,
+    OpenAICompatLLMBackend,
+    register_llm_backend,
+    get_message_class,
+)
 from snowland_agent_base.memory import ChromaMemoryBackend
 from snowland_agent_base.skill import FileSkillBackend, IdfSkillMatcher
 ```
@@ -300,18 +317,45 @@ Subclass, then `register_perception_backend` to be resolved by name.
 
 **Returns**: LangChain `BaseChatModel` instance.
 
-### 6.2 `DashScopeLLMBackend(LLMBackend)` — Bailian (DashScope) backend
+### 6.2 `LLMBackend` (abstract base) — unified root of the two derived interfaces
 
-**Constructor parameters**: `model`, `api_key`, `temperature=0.7`, `max_tokens=2048`,
-`top_p=0.8`, `enable_thinking=False`, `**kwargs` (same as `build_llm`).
+`LLMBackend` is the abstract root of "backend derives two interfaces": different vendor backends
+inherit from it and implement the **same methods** (`build` and `message_class`), so callers
+depend only on the abstraction and need not know the vendor — making it universal.
 
-**Method**: `build() -> BaseChatModel` — builds and returns `ChatDashScope` (auto-injects the
-pydantic v1 compatibility shim internally).
+- `build() -> BaseChatModel`: build and return a `BaseChatModel` instance.
+- `message_class`: the message-style class bound to this backend (`OpenAIMessage` /
+  `AnthropicMessage`); subclasses override it (default `OpenAIMessage`). The Agent obtains this
+  style class via `get_message_class(backend)` to construct protocol-matching polymorphic messages.
 
-### 6.3 `LLMBackend` (abstract base)
-- `build() -> BaseChatModel`: build a ChatModel.
+### 6.3 Built-in backends
 
-Subclass, then `register_llm_backend` to be resolved by `build_llm(backend=...)`.
+| Backend | Base class | `message_class` | Description |
+| --- | --- | --- | --- |
+| `DashScopeLLMBackend` | `LLMBackend` | `OpenAIMessage` | Alibaba Bailian / Qwen (`ChatDashScope`, auto-injects the pydantic v1 shim) |
+| `OrcaRouterLLMBackend` | `OpenAICompatLLMBackend` | `OpenAIMessage` | OrcaRouter OpenAI-compatible routing service |
+| `ZhipuLLMBackend` | `OpenAICompatLLMBackend` | `OpenAIMessage` | Zhipu GLM OpenAI-compatible endpoint |
+| `DeepSeekLLMBackend` | `OpenAICompatLLMBackend` | `OpenAIMessage` | DeepSeek OpenAI-compatible endpoint |
+| `AnthropicLLMBackend` | `LLMBackend` | `AnthropicMessage` | Anthropic native Messages API (`ChatAnthropic`) |
+| `AnthropicOpenAILLMBackend` | `OpenAICompatLLMBackend` | `OpenAIMessage` | Anthropic OpenAI-compatible endpoint (`langchain_openai`) |
+
+`OpenAICompatLLMBackend` is the shared base for OpenAI-compatible vendors; a subclass becomes a
+pluggable backend by overriding the class attributes `default_base_url` / `api_key_env` /
+`base_url_env` / `default_model`. `DashScopeLLMBackend(...)` takes the same constructor params as
+`build_llm` (`model` / `api_key` / `temperature=0.7` / `max_tokens=2048` / `top_p=0.8` /
+`enable_thinking=False` / `**kwargs`).
+
+### 6.4 Registry and factory
+
+| Function | Params | Returns | Description |
+| --- | --- | --- | --- |
+| `register_llm_backend(name, cls)` | `str`, `type[LLMBackend]` | `None` | Register a backend (`cls` must subclass `LLMBackend`) |
+| `get_llm_backend(name) -> type[LLMBackend]` | `str` | backend class | Resolve a registered backend class by name |
+| `list_llm_backends() -> List[str]` | — | name list | List all registered backends |
+| `create_llm_backend(name="dashscope", **kwargs) -> LLMBackend` | `str`, `**kwargs` | backend instance | Build a backend instance by name |
+| `get_message_class(backend) -> type[Message]` | `str?` | message class | Resolve the backend's bound message-style class (`OpenAIMessage` / `AnthropicMessage`); falls back to `OpenAIMessage` for `None` / unknown names |
+
+Subclass `LLMBackend` and `register_llm_backend` to be resolved by `build_llm(backend=...)`.
 
 ---
 
@@ -375,17 +419,32 @@ Subclass, then `register_llm_backend` to be resolved by `build_llm(backend=...)`
 
 ## 8. Message Model
 
-`Message` is a `TypedDict` (`{"role", "content", "name?"}`); `role` ∈
-`system` / `user` / `assistant` / `tool`.
+`Message` is an **abstract base class** holding the common fields `role` / `content` / `name` /
+`tool_call_id` / `tool_calls`; the concrete vendor format is decided by its subclasses, which
+expose the **same method** `to_langchain_messages()`. Callers depend only on the `Message`
+abstraction and need not know the underlying protocol — making it universal:
 
-| Function | Params | Returns | Description |
+- `OpenAIMessage`: OpenAI-compatible (`system→SystemMessage`, `user→HumanMessage`,
+  `assistant→AIMessage`, `tool→` system-context fallback).
+- `AnthropicMessage`: Anthropic native Messages API (`tool` + `tool_call_id→ToolMessage`,
+  `assistant` + `tool_calls→` `AIMessage` with `tool_calls`).
+
+The Agent selects the style class via `get_message_class(backend)` and stays polymorphic
+thereafter, without threading a `backend` string up the call stack.
+
+`Message` provides `to_dict()` / `from_dict()` (JSON serialization), field-level `__eq__`,
+and the `role` / `content` / `name` / `tool_call_id` / `tool_calls` attributes.
+
+| Constructor | Params | Returns | Description |
 | --- | --- | --- | --- |
-| `system_message(content)` | `str` | `Message` | System message |
-| `user_message(content)` | `str` | `Message` | User message |
-| `assistant_message(content)` | `str` | `Message` | Assistant message |
-| `tool_message(content, name="")` | `str`, `str` | `Message` | Tool observation (`tool` role with `name`) |
-| `ensure_messages(history)` | `str`/`List[Message]`/`None` | `List[Message]` | Normalize history to message list (str wrapped as a system message) |
+| `system_message(content, *, cls=OpenAIMessage)` | `str`, `type[Message]` | `Message` | System message |
+| `user_message(content, *, cls=OpenAIMessage)` | `str`, `type[Message]` | `Message` | User message |
+| `assistant_message(content, *, cls=OpenAIMessage)` | `str`, `type[Message]` | `Message` | Assistant message |
+| `tool_message(content, name="", tool_call_id=None, *, cls=OpenAIMessage)` | `str`, `str`, `str?`, `type[Message]` | `Message` | Tool observation |
+| `tool_result_message(content, tool_call_id, name="", *, cls=OpenAIMessage)` | `str`, `str`, `str`, `type[Message]` | `Message` | Anthropic-native tool use only; requires `tool_call_id` |
+| `assistant_tool_call_message(tool_calls, content="", *, cls=OpenAIMessage)` | `Sequence[Dict]`, `str`, `type[Message]` | `Message` | Assistant message carrying `tool_calls` |
+| `ensure_messages(history)` | `str`/`List[Message]`/`None` | `List[Message]` | Normalize history to message list (str wrapped as a system message; dict restored as `OpenAIMessage`) |
 | `render_messages(messages, include_role=True)` | `Sequence[Message]`, `bool` | `str` | Render to text (logs/summaries) |
-| `to_langchain_messages(messages)` | `Sequence[Message]` | `List` | Convert to LangChain message objects (multi-turn context) |
+| `to_langchain_messages(messages)` | `Sequence[Message]` | `List` | Convert to LangChain message objects (vendor format decided by each message's own `to_langchain_messages()`, no `backend` string dispatching) |
 
 `SkillError` is the exception for skill definition/loading errors (subclass of `ValueError`).

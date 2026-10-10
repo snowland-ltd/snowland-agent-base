@@ -6,13 +6,31 @@
 ```python
 import snowland_agent_base as sab
 # 或按模块导入:
-from snowland_agent_base import BaseAgent, GraphAgent, build_llm, VectorMemory, PerceptionLayer, SkillRegistry
+from snowland_agent_base import (
+    BaseAgent,
+    GraphAgent,
+    build_llm,
+    VectorMemory,
+    PerceptionLayer,
+    SkillRegistry,
+    Message,
+    OpenAIMessage,
+    AnthropicMessage,
+)
 ```
 
-具体后端实现类（`DashScopeLLMBackend`、`ChromaMemoryBackend`、`SpacyPerceptionBackend`、`FileSkillBackend`、`IdfSkillMatcher` 等）及注册/工厂函数请从对应子模块导入：
+具体后端实现类（`DashScopeLLMBackend`、`OpenAICompatLLMBackend`、`AnthropicLLMBackend`、
+`ChromaMemoryBackend`、`SpacyPerceptionBackend`、`FileSkillBackend`、`IdfSkillMatcher` 等）
+及注册/工厂函数（`register_llm_backend`、`get_message_class` 等）请从对应子模块导入：
 
 ```python
-from snowland_agent_base.llm import DashScopeLLMBackend, register_llm_backend
+from snowland_agent_base.llm import (
+    DashScopeLLMBackend,
+    AnthropicLLMBackend,
+    OpenAICompatLLMBackend,
+    register_llm_backend,
+    get_message_class,
+)
 from snowland_agent_base.memory import ChromaMemoryBackend
 from snowland_agent_base.skill import FileSkillBackend, IdfSkillMatcher
 ```
@@ -295,16 +313,40 @@ from snowland_agent_base.skill import FileSkillBackend, IdfSkillMatcher
 
 **出参**：LangChain `BaseChatModel` 实例。
 
-### 6.2 `DashScopeLLMBackend(LLMBackend)` — 百炼后端
+### 6.2 `LLMBackend`（抽象基类）— 两种派生接口的统一根
 
-**构造入参**：`model`、`api_key`、`temperature=0.7`、`max_tokens=2048`、`top_p=0.8`、`enable_thinking=False`、`**kwargs`（同 `build_llm`）。
+`LLMBackend` 是「backend 派生两种接口」的抽象根: 不同厂商后端继承它, 并实现**相同的方法** (`build` 与 `message_class`), 调用方只依赖抽象, 不感知厂商, 从而通用。
 
-**方法**：`build() -> BaseChatModel` — 构建并返回 `ChatDashScope`（内部自动注入 pydantic v1 兼容垫片）。
+- `build() -> BaseChatModel`：构建并返回一个 ``BaseChatModel`` 实例。
+- `message_class`：该后端配套的消息风格类 (``OpenAIMessage`` / ``AnthropicMessage``); 子类覆写, 默认 ``OpenAIMessage``。Agent 经 `get_message_class(backend)` 取回此风格类, 用于构造匹配协议的多态消息。
 
-### 6.3 `LLMBackend`（抽象基类）
-- `build() -> BaseChatModel`：构建 ChatModel。
+### 6.3 内置后端
 
-继承并 `register_llm_backend` 注册后即可被 `build_llm(backend=...)` 解析。
+| 后端 | 基类 | `message_class` | 说明 |
+| --- | --- | --- | --- |
+| `DashScopeLLMBackend` | `LLMBackend` | `OpenAIMessage` | 阿里云百炼 / 通义千问 (`ChatDashScope`, 内部自动注入 pydantic v1 兼容垫片) |
+| `OrcaRouterLLMBackend` | `OpenAICompatLLMBackend` | `OpenAIMessage` | OrcaRouter OpenAI 兼容路由服务 |
+| `ZhipuLLMBackend` | `OpenAICompatLLMBackend` | `OpenAIMessage` | 智谱 GLM OpenAI 兼容接口 |
+| `DeepSeekLLMBackend` | `OpenAICompatLLMBackend` | `OpenAIMessage` | DeepSeek OpenAI 兼容接口 |
+| `AnthropicLLMBackend` | `LLMBackend` | `AnthropicMessage` | Anthropic 原生 Messages API (`ChatAnthropic`) |
+| `AnthropicOpenAILLMBackend` | `OpenAICompatLLMBackend` | `OpenAIMessage` | Anthropic OpenAI 兼容接口 (`langchain_openai`) |
+
+`OpenAICompatLLMBackend` 是 OpenAI 兼容厂商的统一基类, 子类仅需覆盖类属性
+`default_base_url` / `api_key_env` / `base_url_env` / `default_model` 即可成为一个可插拔后端;
+`DashScopeLLMBackend(...)` 的构造入参与 `build_llm` 一致 (`model` / `api_key` /
+`temperature=0.7` / `max_tokens=2048` / `top_p=0.8` / `enable_thinking=False` / `**kwargs`)。
+
+### 6.4 注册表与工厂
+
+| 函数 | 入参 | 出参 | 说明 |
+| --- | --- | --- | --- |
+| `register_llm_backend(name, cls)` | `str`, `type[LLMBackend]` | `None` | 注册后端 (`cls` 须继承 `LLMBackend`) |
+| `get_llm_backend(name) -> type[LLMBackend]` | `str` | 后端类 | 按名称取回已注册后端类 |
+| `list_llm_backends() -> List[str]` | — | 名称列表 | 列出所有已注册后端 |
+| `create_llm_backend(name="dashscope", **kwargs) -> LLMBackend` | `str`, `**kwargs` | 后端实例 | 按名称构建后端实例 |
+| `get_message_class(backend) -> type[Message]` | `str?` | 消息类 | 取回后端配套的消息风格类 (`OpenAIMessage` / `AnthropicMessage`); `None` / 未知名称回退 `OpenAIMessage` |
+
+继承 `LLMBackend` 并 `register_llm_backend` 注册后即可被 `build_llm(backend=...)` 解析。
 
 ---
 
@@ -366,16 +408,30 @@ from snowland_agent_base.skill import FileSkillBackend, IdfSkillMatcher
 
 ## 8. 消息模型 (Messages)
 
-`Message` 为 `TypedDict`（`{"role", "content", "name?"}`），`role` 取值 `system`/`user`/`assistant`/`tool`。
+`Message` 为**抽象基类**, 持有通用字段 `role` / `content` / `name` / `tool_call_id` /
+`tool_calls`; 具体厂商格式由子类决定, 二者提供**相同的方法** `to_langchain_messages()`,
+调用方只依赖 `Message` 抽象, 不感知底层协议, 从而通用:
 
-| 函数 | 入参 | 出参 | 说明 |
+- `OpenAIMessage`：OpenAI 兼容协议 (`system→SystemMessage`、`user→HumanMessage`、
+  `assistant→AIMessage`、`tool→` 系统上下文回退)。
+- `AnthropicMessage`：Anthropic 原生 Messages API (`tool` + `tool_call_id→ToolMessage`、
+  `assistant` + `tool_calls→` 带 `tool_calls` 的 `AIMessage`)。
+
+Agent 通过 `get_message_class(backend)` 选定风格类后全程多态, 不再向上层透传 `backend` 字符串。
+
+`Message` 通用能力: `to_dict()` / `from_dict()` (JSON 序列化)、字段级比较 `__eq__`、
+`role` / `content` / `name` / `tool_call_id` / `tool_calls` 属性。
+
+| 构造器 | 入参 | 出参 | 说明 |
 | --- | --- | --- | --- |
-| `system_message(content)` | `str` | `Message` | 系统消息 |
-| `user_message(content)` | `str` | `Message` | 用户消息 |
-| `assistant_message(content)` | `str` | `Message` | 助手消息 |
-| `tool_message(content, name="")` | `str`, `str` | `Message` | 工具观测消息（`tool` 角色带 `name`） |
-| `ensure_messages(history)` | `str`/`List[Message]`/`None` | `List[Message]` | 统一历史为消息列表（字符串包为单条系统消息） |
+| `system_message(content, *, cls=OpenAIMessage)` | `str`, `type[Message]` | `Message` | 系统消息 |
+| `user_message(content, *, cls=OpenAIMessage)` | `str`, `type[Message]` | `Message` | 用户消息 |
+| `assistant_message(content, *, cls=OpenAIMessage)` | `str`, `type[Message]` | `Message` | 助手消息 |
+| `tool_message(content, name="", tool_call_id=None, *, cls=OpenAIMessage)` | `str`, `str`, `str?`, `type[Message]` | `Message` | 工具观测消息 |
+| `tool_result_message(content, tool_call_id, name="", *, cls=OpenAIMessage)` | `str`, `str`, `str`, `type[Message]` | `Message` | Anthropic 原生 tool use 专用, 必须带 `tool_call_id` |
+| `assistant_tool_call_message(tool_calls, content="", *, cls=OpenAIMessage)` | `Sequence[Dict]`, `str`, `type[Message]` | `Message` | 携带 `tool_calls` 的助手消息 |
+| `ensure_messages(history)` | `str`/`List[Message]`/`None` | `List[Message]` | 统一历史为消息列表 (字符串包为单条系统消息; dict 按 `OpenAIMessage` 还原) |
 | `render_messages(messages, include_role=True)` | `Sequence[Message]`, `bool` | `str` | 渲染为文本（日志/摘要） |
-| `to_langchain_messages(messages)` | `Sequence[Message]` | `List` | 转为 LangChain 消息对象（多轮上下文） |
+| `to_langchain_messages(messages)` | `Sequence[Message]` | `List` | 转为 LangChain 消息对象 (由每条消息自身 `to_langchain_messages()` 决定厂商格式, 不再依赖 `backend` 字符串) |
 
 `SkillError` 为 skill 定义/加载错误异常（继承自 `ValueError`）。

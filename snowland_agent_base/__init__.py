@@ -111,4 +111,4 @@ except ImportError:  # pragma: no cover
     GraphAgent = None  # type: ignore[assignment]
 
 
-__version__ = "0.1.0beta2"
+__version__ = "0.1"
