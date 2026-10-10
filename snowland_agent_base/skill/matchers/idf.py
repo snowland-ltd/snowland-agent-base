@@ -15,7 +15,7 @@
 """IDF 加权词面召回策略。"""
 from __future__ import annotations
 
-from typing import List, Optional, Sequence
+from typing import List, Optional, Sequence, Dict
 
 from snowland_agent_base.skill.base import SkillMatcher
 from snowland_agent_base.skill.models import Skill
