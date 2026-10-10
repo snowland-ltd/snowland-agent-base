@@ -141,16 +141,16 @@ class TestHistoryInput(unittest.TestCase):
         history = [{"role": "user", "content": "上一轮"}]
         result = self.agent.invoke("本轮", thread_id="h-3", history=history)
 
-        contents = [m["content"] for m in result["messages"]]
+        contents = [m.content for m in result["messages"]]
         self.assertEqual(contents, ["上一轮", "本轮", "答复"])
-        self.assertEqual([m["role"] for m in result["messages"]], ["user", "user", "assistant"])
+        self.assertEqual([m.role for m in result["messages"]], ["user", "user", "assistant"])
 
     def test_history_string_compat(self):
         """兼容字符串形式的历史。"""
         self.llm.responses = ['{"thought": "t", "final_answer": "ok"}']
         result = self.agent.invoke("x", thread_id="h-4", history="之前的对话")
         self.assertTrue(result["success"])
-        self.assertIn("之前的对话", result["messages"][0]["content"])
+        self.assertIn("之前的对话", result["messages"][0].content)
 
     def test_no_history_still_works(self):
         """不传 history 时行为不变。"""
@@ -178,7 +178,7 @@ class TestHistoryInput(unittest.TestCase):
         self.llm.responses = ['{"thought": "t", "final_answer": "ok"}']
         history = [user_message("你好"), assistant_message("嗨")]
         result = self.agent.invoke("再聊", thread_id="h-8", history=history)
-        contents = [m["content"] for m in result["messages"]]
+        contents = [m.content for m in result["messages"]]
         self.assertEqual(contents, ["你好", "嗨", "再聊", "ok"])
 
 

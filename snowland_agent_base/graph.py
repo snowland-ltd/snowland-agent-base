@@ -356,7 +356,9 @@ class GraphAgent(BaseAgent):
         step_count = int(state.get("step_count") or 0) + 1
         steps.append({"step": step_count, "action": action, "observation": observation})
 
-        obs_message = tool_message(self._render_observation(observation), name=tool)
+        obs_message = tool_message(
+            self._render_observation(observation), name=tool, cls=self._message_cls
+        )
         observations = list(state.get("observations") or []) + [obs_message]
         history = list(state.get("history") or []) + [obs_message]
         return {
@@ -388,11 +390,11 @@ class GraphAgent(BaseAgent):
         messages: List[Message] = (
             memory_messages
             + prior_history
-            + [user_message(state.get("input", ""))]
+            + [user_message(state.get("input", ""), cls=self._message_cls)]
             + observations
         )
         if answer:
-            messages.append(assistant_message(answer))
+            messages.append(assistant_message(answer, cls=self._message_cls))
         return {"answer": answer, "messages": messages}
 
     @staticmethod

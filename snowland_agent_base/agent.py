@@ -36,6 +36,7 @@ from snowland_agent_base.messages import (
     tool_message,
     user_message,
 )
+from snowland_agent_base.llm.registry import get_message_class
 from snowland_agent_base.perception import PerceptionLayer, PerceptionBackend
 from snowland_agent_base.skill import Skill, SkillRegistry
 
@@ -93,8 +94,10 @@ class BaseAgent:
         self.use_perception = use_perception
         self.use_memory = use_memory and embedding is not None
         self._system_prompt = system_prompt
-        # 后端名称 (如 "anthropic"): 透传给决策层, 用于消息原生 tool use 转换
+        # 后端名称 (如 "anthropic"): 仅用于选择配套的消息风格类,
+        # 构造消息时统一用 self._message_cls, 决策层不再感知具体后端。
         self._backend = backend
+        self._message_cls = get_message_class(backend)
 
         self.skills = skills or SkillRegistry()
         self.auto_activate_skills = auto_activate_skills
@@ -257,7 +260,6 @@ class BaseAgent:
                 context=context,
                 system_prompt=system_prompt,
                 skills=active_skills,
-                backend=self._backend,
             )
             logger.debug("step %s -> %s", step, action.to_dict())
 
@@ -271,7 +273,9 @@ class BaseAgent:
                 {"step": step, "action": action.to_dict(), "observation": observation}
             )
             obs_message = tool_message(
-                self._render_observation(observation), name=action.tool or ""
+                self._render_observation(observation),
+                name=action.tool or "",
+                cls=self._message_cls,
             )
             observations.append(obs_message)
             history.append(obs_message)
@@ -282,10 +286,12 @@ class BaseAgent:
         self._memorize(user_input, answer)
 
         messages: List[Message] = (
-            memory_messages + [user_message(user_input)] + observations
+            memory_messages
+            + [user_message(user_input, cls=self._message_cls)]
+            + observations
         )
         if answer:
-            messages.append(assistant_message(answer))
+            messages.append(assistant_message(answer, cls=self._message_cls))
 
         return {
             "input": user_input,
@@ -338,7 +344,7 @@ class BaseAgent:
         if not recalled:
             return []
         body = "\n".join(f"- {r}" for r in recalled)
-        return [system_message(f"检索到的相关记忆:\n{body}")]
+        return [system_message(f"检索到的相关记忆:\n{body}", cls=self._message_cls)]
 
     @staticmethod
     def _render_observation(observation: Dict[str, Any]) -> str:

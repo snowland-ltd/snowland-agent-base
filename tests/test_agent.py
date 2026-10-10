@@ -152,10 +152,10 @@ class TestBaseAgent(unittest.TestCase):
         result = agent.run("你好")
 
         self.assertIsInstance(result["messages"], list)
-        self.assertEqual(result["messages"][-1]["role"], "assistant")
-        self.assertEqual(result["messages"][-1]["content"], "答复内容")
+        self.assertEqual(result["messages"][-1].role, "assistant")
+        self.assertEqual(result["messages"][-1].content, "答复内容")
         # user 消息应在助手之前
-        roles = [m["role"] for m in result["messages"]]
+        roles = [m.role for m in result["messages"]]
         self.assertEqual(roles, ["user", "assistant"])
 
     def test_output_messages_with_tool_observation(self):
@@ -167,10 +167,10 @@ class TestBaseAgent(unittest.TestCase):
         agent.register_tool("add", lambda a, b: a + b)
         result = agent.run("1+2")
 
-        roles = [m["role"] for m in result["messages"]]
+        roles = [m.role for m in result["messages"]]
         self.assertEqual(roles, ["user", "tool", "assistant"])
-        self.assertIn("3", result["messages"][1]["content"])
-        self.assertEqual(result["messages"][1]["name"], "add")
+        self.assertIn("3", result["messages"][1].content)
+        self.assertEqual(result["messages"][1].name, "add")
 
     def test_history_passed_as_message_list(self):
         """决策层收到的 history 应是消息列表。"""

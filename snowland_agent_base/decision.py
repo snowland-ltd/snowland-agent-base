@@ -168,7 +168,6 @@ class DecisionLayer:
         history: Union[str, Sequence[Message], None] = None,
         system_prompt: Optional[str] = None,
         skills: Optional[Sequence[Skill]] = None,
-        backend: Optional[str] = None,
     ) -> List[Any]:
         """组装完整消息序列: 系统提示词 + 历史消息 + 当前输入。
 
@@ -186,7 +185,7 @@ class DecisionLayer:
             tools=tools, system_prompt=system_prompt, skills=skills
         )
         messages: List[Any] = [SystemMessage(content=prompt)]
-        messages.extend(to_langchain_messages(ensure_messages(history), backend=backend))
+        messages.extend(to_langchain_messages(ensure_messages(history)))
         messages.append(HumanMessage(content=user_input))
         return messages
 
@@ -213,7 +212,6 @@ class DecisionLayer:
         context: Optional[Dict[str, Any]] = None,
         system_prompt: Optional[str] = None,
         skills: Optional[Sequence[Skill]] = None,
-        backend: Optional[str] = None,
     ) -> AgentAction:
         """产出下一步动作。
 
@@ -239,7 +237,6 @@ class DecisionLayer:
             history=history,
             system_prompt=system_prompt,
             skills=skills,
-            backend=backend,
         )
 
         last_raw = ""
