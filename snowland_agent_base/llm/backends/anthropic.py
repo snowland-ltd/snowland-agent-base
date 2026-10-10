@@ -36,10 +36,14 @@ from langchain_core.language_models import BaseChatModel
 
 from snowland_agent_base._compat import ensure_pydantic_v1_shim
 from snowland_agent_base.llm.base import LLMBackend
+from snowland_agent_base.messages import AnthropicMessage
 
 
 class AnthropicLLMBackend(LLMBackend):
     """基于 Anthropic 原生 Messages API 的 ChatModel 后端。"""
+
+    #: 该后端使用的消息风格 (Anthropic 原生 Messages API -> AnthropicMessage)。
+    message_class = AnthropicMessage
 
     #: Anthropic 官方 API 地址 (可经 base_url / ANTHROPIC_BASE_URL 覆盖)。
     default_base_url: str = "https://api.anthropic.com"

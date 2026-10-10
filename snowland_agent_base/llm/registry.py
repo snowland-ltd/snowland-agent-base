@@ -26,6 +26,7 @@ from snowland_agent_base.llm.backends.anthropic_openai import (
     AnthropicOpenAILLMBackend,
 )
 from snowland_agent_base.llm.base import LLMBackend
+from snowland_agent_base.messages import Message, OpenAIMessage
 
 
 _LLM_BACKENDS: Dict[str, type] = {}
@@ -48,6 +49,26 @@ def get_llm_backend(name: str) -> type:
 def list_llm_backends() -> list:
     """列出所有已注册的大模型后端名称。"""
     return list(_LLM_BACKENDS)
+
+
+def get_message_class(backend: Optional[str]) -> type[Message]:
+    """按后端名取回其配套的消息风格类 (``OpenAIMessage`` / ``AnthropicMessage``)。
+
+    每个 :class:`LLMBackend` 子类通过 ``message_class`` 声明自己使用的消息格式,
+    调用方据此构造与后端协议匹配的消息对象, 无需硬编码 ``backend`` 字符串分支。
+
+    Args:
+        backend: 后端名称或已注册别名; ``None`` / 未知名称均回退为 ``OpenAIMessage``。
+
+    Returns:
+        消息风格类。
+    """
+    if not backend:
+        return OpenAIMessage
+    try:
+        return get_llm_backend(backend).message_class
+    except KeyError:
+        return OpenAIMessage
 
 
 def create_llm_backend(name: str = "dashscope", **kwargs) -> LLMBackend:

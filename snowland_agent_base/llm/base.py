@@ -22,9 +22,24 @@ from abc import ABC, abstractmethod
 
 from langchain_core.language_models import BaseChatModel
 
+from snowland_agent_base.messages import OpenAIMessage
+
 
 class LLMBackend(ABC):
-    """大模型后端统一接口: 产出 LangChain ``BaseChatModel``。"""
+    """大模型后端统一接口: 产出 LangChain ``BaseChatModel``。
+
+    该基类是「backend 派生出两种接口」的抽象根: 不同厂商后端 (OpenAI 兼容 /
+    Anthropic 原生) 继承自它, 并实现**相同的方法** (``build`` 与 ``message_class``),
+    调用方只依赖抽象, 不感知具体厂商, 从而通用。
+
+    - ``build``: 构建 ChatModel 实例 (各后端实现不同);
+    - ``message_class``: 该后端配套的消息风格类 (``OpenAIMessage`` /
+      ``AnthropicMessage``), 子类覆写以绑定自身协议; 默认 ``OpenAIMessage``
+      (多数厂商走 OpenAI 兼容协议)。
+    """
+
+    #: 该后端配套的消息风格类; 子类按自身协议覆写。
+    message_class = OpenAIMessage
 
     @abstractmethod
     def build(self) -> BaseChatModel:

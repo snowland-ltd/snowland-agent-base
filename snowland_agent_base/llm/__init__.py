@@ -53,6 +53,7 @@ from snowland_agent_base.llm.factory import build_llm
 from snowland_agent_base.llm.registry import (
     create_llm_backend,
     get_llm_backend,
+    get_message_class,
     list_llm_backends,
     register_llm_backend,
 )
@@ -71,4 +72,5 @@ __all__ = [
     "get_llm_backend",
     "list_llm_backends",
     "create_llm_backend",
+    "get_message_class",
 ]

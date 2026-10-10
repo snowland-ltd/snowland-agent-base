@@ -51,6 +51,8 @@ from snowland_agent_base.execution import ToolExecutor
 # ---- 消息模型与构造器 ----
 from snowland_agent_base.messages import (
     Message,
+    OpenAIMessage,
+    AnthropicMessage,
     assistant_message,
     system_message,
     tool_message,
@@ -84,6 +86,8 @@ __all__ = [
     "ToolExecutor",
     # messages
     "Message",
+    "OpenAIMessage",
+    "AnthropicMessage",
     "system_message",
     "user_message",
     "assistant_message",

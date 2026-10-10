@@ -28,10 +28,14 @@ from langchain_core.language_models import BaseChatModel
 
 from snowland_agent_base._compat import ensure_pydantic_v1_shim
 from snowland_agent_base.llm.base import LLMBackend
+from snowland_agent_base.messages import OpenAIMessage
 
 
 class OpenAICompatLLMBackend(LLMBackend):
     """OpenAI 兼容 ChatModel 后端基类。"""
+
+    #: 该后端使用的消息风格 (OpenAI 兼容协议 -> OpenAIMessage)。
+    message_class = OpenAIMessage
 
     #: 厂商 OpenAI 兼容接口地址 (缺省回退 base_url_env)。
     default_base_url: str = ""
