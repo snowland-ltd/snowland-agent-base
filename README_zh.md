@@ -105,6 +105,22 @@ print(result["answer"])
 
 完整示例见 `examples/quickstart.py`。
 
+## OrcaRouter（大模型后端）
+
+snowland-agent-base 集成了 [OrcaRouter](https://www.orcarouter.ai/) —— 一个 OpenAI 兼容的大模型路由网关 —— 作为可插拔后端。它可在 OpenAI、Anthropic、Gemini、DeepSeek、Qwen 等模型间路由，支持智能路由与 fallback 链。
+
+```python
+from snowland_agent_base.llm import build_llm
+
+llm = build_llm(backend="orcarouter", model="orcarouter/auto")
+```
+
+通过 `ORCA_KEY`（或 `ORCAROUTER_API_KEY`）环境变量设置 API Key。参考 provider 配置见 `examples/providers.toml`。
+
+如果你觉得本项目有用，可以通过我们的推广链接注册 OrcaRouter —— 新账户会自动归因到我们，对你没有任何额外成本：
+
+https://www.orcarouter.ai/ref/ref_808b7e19b052dee31192
+
 ## 消息模型
 
 历史会话与 Agent 输出均使用 **消息列表**（`List[Message]`），而非拼接的字符串 —— 这样能保留角色结构，便于持久化、多轮对话和前端渲染。

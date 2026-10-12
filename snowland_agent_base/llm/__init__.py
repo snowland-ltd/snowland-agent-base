@@ -29,7 +29,7 @@
     build_llm()                                              # 默认百炼
     build_llm(backend="dashscope", model="qwen-max")
     build_llm(backend="qwen", model="qwen-max")              # 通义千问 (别名)
-    build_llm(backend="orcarouter", base_url="http://orcarouter:8000/v1", model="orca-router")
+    build_llm(backend="orcarouter", model="orcarouter/auto")     # 默认 base_url 已内置
     build_llm(backend="zhipu", api_key="...")                # 智谱 GLM
     build_llm(backend="deepseek", api_key="...")             # DeepSeek
     build_llm(backend=MyLLMBackend(...))                     # 直接注入实例
@@ -45,6 +45,9 @@ from snowland_agent_base.llm.backends import (
     DashScopeLLMBackend,
     DeepSeekLLMBackend,
     OrcaRouterLLMBackend,
+    ORCAROUTER_REF,
+    build_orcarouter_auth_url,
+    exchange_orcarouter_code,
     ZhipuLLMBackend,
     AnthropicLLMBackend,
     AnthropicOpenAILLMBackend,
@@ -67,6 +70,9 @@ __all__ = [
     "DeepSeekLLMBackend",
     "AnthropicLLMBackend",
     "AnthropicOpenAILLMBackend",
+    "ORCAROUTER_REF",
+    "build_orcarouter_auth_url",
+    "exchange_orcarouter_code",
     "build_llm",
     "register_llm_backend",
     "get_llm_backend",

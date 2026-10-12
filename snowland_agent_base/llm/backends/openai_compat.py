@@ -22,13 +22,55 @@ OrcaRouter / 智谱 / DeepSeek 等多数厂商提供 OpenAI 兼容的
 from __future__ import annotations
 
 import os
-from typing import Dict, Optional
+from typing import Any, Dict, Optional
 
 from langchain_core.language_models import BaseChatModel
+from langchain_core.outputs import ChatResult
+from langchain_openai import ChatOpenAI
 
 from snowland_agent_base._compat import ensure_pydantic_v1_shim
 from snowland_agent_base.llm.base import LLMBackend
 from snowland_agent_base.messages import OpenAIMessage
+
+
+class ReasoningChatOpenAI(ChatOpenAI):
+    """ChatOpenAI 补丁: 兼容把答案放在 ``reasoning_content`` 的推理模型。
+
+    部分 OpenAI 兼容推理模型 (如 orcarouter/free) 会把最终答复放进
+    ``reasoning_content`` 通道, 而 ``content`` 为空。langchain-openai 不会把该字段
+    映射成 ``content``, 导致决策/执行层读到空串而走兜底。这里在 ``content`` 为空时
+    回退用 ``reasoning_content`` 作为正文, 仅在 ``content`` 为空时生效, 不破坏正常返回。
+    """
+
+    @staticmethod
+    def _extract_reasoning(response: Any, idx: int) -> Optional[str]:
+        """从原始响应里取第 idx 个 choice 的 ``reasoning_content``。"""
+        try:
+            if isinstance(response, dict):
+                msg = response["choices"][idx]["message"]
+                if isinstance(msg, dict):
+                    return msg.get("reasoning_content")
+                return getattr(msg, "reasoning_content", None)
+            msg = response.choices[idx].message
+            return getattr(msg, "reasoning_content", None)
+        except Exception:  # noqa: BLE001 - 取不到就当没有, 走原逻辑
+            return None
+
+    def _create_chat_result(
+        self,
+        response: Any,
+        generation_info: Optional[Dict[str, Any]] = None,
+    ) -> ChatResult:
+        result = super()._create_chat_result(response, generation_info=generation_info)
+        for i, generation in enumerate(result.generations):
+            reasoning = self._extract_reasoning(response, i)
+            message = generation.message
+            if reasoning and not getattr(message, "content", None):
+                try:
+                    message.content = reasoning
+                except Exception:  # noqa: BLE001 - 极端情况下 content 只读, 忽略
+                    pass
+        return result
 
 
 class OpenAICompatLLMBackend(LLMBackend):
@@ -91,6 +133,7 @@ class OpenAICompatLLMBackend(LLMBackend):
         # 共享环境 langchain-core 1.x 已移除 pydantic_v1;
         # 用 pydantic.v1 注入 shim, 避免 langchain_openai 运行期导入失败。
         ensure_pydantic_v1_shim()
-        from langchain_openai import ChatOpenAI
 
-        return ChatOpenAI(**self._params)
+        # 用补丁子类: 兼容把答案放进 reasoning_content 的推理模型
+        # (如 orcarouter/free), 避免 content 为空导致决策层走兜底。
+        return ReasoningChatOpenAI(**self._params)

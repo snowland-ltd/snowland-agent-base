@@ -21,7 +21,12 @@ from __future__ import annotations
 
 from snowland_agent_base.llm.backends.dashscope import DashScopeLLMBackend
 from snowland_agent_base.llm.backends.deepseek import DeepSeekLLMBackend
-from snowland_agent_base.llm.backends.orcarouter import OrcaRouterLLMBackend
+from snowland_agent_base.llm.backends.orcarouter import (
+    ORCAROUTER_REF,
+    OrcaRouterLLMBackend,
+    build_orcarouter_auth_url,
+    exchange_orcarouter_code,
+)
 from snowland_agent_base.llm.backends.zhipu import ZhipuLLMBackend
 from snowland_agent_base.llm.backends.anthropic import AnthropicLLMBackend
 from snowland_agent_base.llm.backends.anthropic_openai import (
@@ -36,4 +41,7 @@ __all__ = [
     "DeepSeekLLMBackend",
     "AnthropicLLMBackend",
     "AnthropicOpenAILLMBackend",
+    "ORCAROUTER_REF",
+    "build_orcarouter_auth_url",
+    "exchange_orcarouter_code",
 ]

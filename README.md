@@ -110,6 +110,27 @@ print(result["answer"])
 
 Full example: `examples/quickstart.py`.
 
+## OrcaRouter (LLM Backend)
+
+snowland-agent-base integrates [OrcaRouter](https://www.orcarouter.ai/) — an
+OpenAI-compatible LLM routing gateway — as a pluggable backend. It routes across
+OpenAI, Anthropic, Gemini, DeepSeek, Qwen and more, with smart routing and
+fallback chains.
+
+```python
+from snowland_agent_base.llm import build_llm
+
+llm = build_llm(backend="orcarouter", model="orcarouter/auto")
+```
+
+Set the API key via the `ORCA_KEY` (or `ORCAROUTER_API_KEY`) environment variable.
+A reference provider config lives at `examples/providers.toml`.
+
+If you find this project useful, sign up for OrcaRouter through our referral link —
+new accounts are attributed to us at no extra cost to you:
+
+https://www.orcarouter.ai/ref/ref_808b7e19b052dee31192
+
 ## Message Model
 
 Both conversation history and Agent output use a **message list** (`List[Message]`)

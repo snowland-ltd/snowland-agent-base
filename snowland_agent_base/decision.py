@@ -35,6 +35,50 @@ from snowland_agent_base.skill import Skill, SkillRegistry
 logger = logging.getLogger(__name__)
 
 
+def _extract_json_object(text: str) -> Optional[Dict[str, Any]]:
+    """从文本中抽取第一个配平的 JSON 对象。
+
+    先尝试整段直接 ``json.loads``; 失败则从首个 ``{`` 起做括号配平扫描
+    (正确处理字符串内的引号与转义), 取首个完整对象。抽不到返回 ``None``。
+    """
+    if not text:
+        return None
+    try:
+        return json.loads(text)
+    except (json.JSONDecodeError, ValueError):
+        pass
+
+    start = text.find("{")
+    if start == -1:
+        return None
+    depth = 0
+    in_str = False
+    esc = False
+    for i in range(start, len(text)):
+        ch = text[i]
+        if in_str:
+            if esc:
+                esc = False
+            elif ch == "\\":
+                esc = True
+            elif ch == '"':
+                in_str = False
+            continue
+        if ch == '"':
+            in_str = True
+        elif ch == "{":
+            depth += 1
+        elif ch == "}":
+            depth -= 1
+            if depth == 0:
+                candidate = text[start : i + 1]
+                try:
+                    return json.loads(candidate)
+                except (json.JSONDecodeError, ValueError):
+                    return None
+    return None
+
+
 @dataclass
 class AgentAction:
     """决策层产出的结构化动作。"""
@@ -243,7 +287,7 @@ class DecisionLayer:
         for attempt in range(self._max_parse_retries + 1):
             try:
                 response = self._llm.invoke(messages)
-                last_raw = getattr(response, "content", str(response))
+                last_raw = self._extract_text(response)
                 return self._parse_action(last_raw)
             except Exception as exc:  # noqa: BLE001
                 logger.warning("LLM 决策第 %s 次失败: %s", attempt + 1, exc)
@@ -252,8 +296,33 @@ class DecisionLayer:
         return AgentAction(thought="决策失败, 使用兜底答复", final_answer=self._fallback_answer)
 
     @staticmethod
+    def _extract_text(response: Any) -> str:
+        """从 LLM 响应中取出可供决策解析的文本。
+
+        多数模型把答案放在 ``content``; 但推理模型(如 orcarouter/free)会把最终
+        JSON 动作塞进 ``reasoning_content`` 而让 ``content`` 为空, 直接解析会失败。
+        这里优先用 ``content``, 为空时回退到 ``reasoning_content``, 保证决策层
+        能拿到动作 JSON, 而不是一路走兜底。
+        """
+        content = getattr(response, "content", "") or ""
+        if isinstance(content, str) and content.strip():
+            return content
+        reasoning = ""
+        extra = getattr(response, "additional_kwargs", None) or {}
+        if isinstance(extra, dict):
+            reasoning = extra.get("reasoning_content", "") or ""
+        if not reasoning and hasattr(response, "reasoning_content"):
+            reasoning = getattr(response, "reasoning_content", "") or ""
+        return reasoning if isinstance(reasoning, str) else ""
+
+    @staticmethod
     def _parse_action(raw: str) -> AgentAction:
-        """从 LLM 输出中解析 JSON 动作, 兼容 ```json 代码块包裹。"""
+        """从 LLM 输出中解析 JSON 动作, 兼容 ```json 代码块包裹与 JSON 内嵌在文本中。
+
+        推理模型(如 orcarouter/free)常把最终 JSON 答案混在叙述/推理里返回, 直接
+        ``json.loads`` 会失败; 这里在直接解析失败时, 退而抽取文本中第一个配平的 JSON
+        对象, 提升对这类模型的兼容性。
+        """
         text = raw.strip()
         if text.startswith("```"):
             text = text.strip("`")
@@ -261,7 +330,9 @@ class DecisionLayer:
                 text = text[4:]
             text = text.strip()
 
-        data = json.loads(text)
+        data = _extract_json_object(text)
+        if data is None:
+            raise ValueError("无法从 LLM 输出中解析出 JSON 动作")
         return AgentAction(
             thought=data.get("thought", ""),
             tool=data.get("tool"),
