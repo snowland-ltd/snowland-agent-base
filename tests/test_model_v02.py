@@ -132,21 +132,33 @@ class FakeEmbeddingBackend(EmbeddingBackend):
 
 
 class FakeImageBackend(ImageBackend):
+    def __init__(self, model=None, **kwargs):
+        self.model = model
+
     def build(self):
         return FakeImageModel()
 
 
 class FakeVideoBackend(VideoBackend):
+    def __init__(self, model=None, **kwargs):
+        self.model = model
+
     def build(self):
         return FakeVideoModel()
 
 
 class FakeTTSBackend(TTSBackend):
+    def __init__(self, model=None, **kwargs):
+        self.model = model
+
     def build(self):
         return FakeTTSModel()
 
 
 class FakeRerankBackend(RerankBackend):
+    def __init__(self, model=None, **kwargs):
+        self.model = model
+
     def build(self):
         return FakeRerankModel()
 

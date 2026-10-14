@@ -33,15 +33,28 @@ from snowland_agent_base.model.backends.dashscope import (
     DashScopeVideoBackend,
     DashScopeVideoModel,
 )
-from snowland_agent_base.model.backends.deepseek import DeepSeekLLMBackend
+from snowland_agent_base.model.backends.deepseek import (
+    DeepSeekEmbeddingBackend,
+    DeepSeekLLMBackend,
+    DeepSeekRerankBackend,
+)
 from snowland_agent_base.model.backends.orcarouter import (
     ORCAROUTER_REF,
+    OrcaRouterEmbeddingBackend,
+    OrcaRouterImageBackend,
     OrcaRouterLLMBackend,
+    OrcaRouterRerankBackend,
+    OrcaRouterTTSBackend,
+    OrcaRouterVideoBackend,
     build_orcarouter_auth_url,
     exchange_orcarouter_code,
 )
 from snowland_agent_base.model.backends.zhipu import (
+    ZhipuEmbeddingBackend,
+    ZhipuImageBackend,
     ZhipuLLMBackend,
+    ZhipuRerankBackend,
+    ZhipuTTSBackend,
     ZhipuVideoBackend,
     ZhipuVideoModel,
 )
@@ -75,10 +88,21 @@ __all__ = [
     "DashScopeRerankBackend",
     "DashScopeRerankModel",
     "OrcaRouterLLMBackend",
+    "OrcaRouterEmbeddingBackend",
+    "OrcaRouterImageBackend",
+    "OrcaRouterVideoBackend",
+    "OrcaRouterTTSBackend",
+    "OrcaRouterRerankBackend",
     "ZhipuLLMBackend",
+    "ZhipuEmbeddingBackend",
+    "ZhipuImageBackend",
+    "ZhipuTTSBackend",
+    "ZhipuRerankBackend",
     "ZhipuVideoBackend",
     "ZhipuVideoModel",
     "DeepSeekLLMBackend",
+    "DeepSeekEmbeddingBackend",
+    "DeepSeekRerankBackend",
     "AnthropicLLMBackend",
     "AnthropicOpenAILLMBackend",
     "OpenAICompatLLMBackend",
