@@ -53,7 +53,7 @@ class BailianPerceptionBackend(PerceptionBackend):
     """基于阿里云百炼 (DashScope) 大模型的感知后端。
 
     通过 LLM 完成实体识别与意图分类, 适合 spaCy 未覆盖的语言 / 领域。
-    ``llm`` 缺省时惰性调用 :func:`snowland_agent_base.llm.build_llm` 构建
+    ``llm`` 缺省时惰性调用 :func:`snowland_agent_base.model.build_llm` 构建
     (需设置 ``DASHSCOPE_API_KEY`` 环境变量或传入 ``api_key``)。
     """
 
@@ -89,7 +89,7 @@ class BailianPerceptionBackend(PerceptionBackend):
     def llm(self) -> BaseChatModel:
         """惰性构建 DashScope ChatModel。"""
         if self._llm is None:
-            from snowland_agent_base.llm import build_llm
+            from snowland_agent_base.model import build_llm
 
             self._llm = (
                 build_llm(model=self._model) if self._model else build_llm()

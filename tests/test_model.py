@@ -18,7 +18,7 @@ import unittest
 
 from langchain_core.language_models import BaseChatModel
 
-from snowland_agent_base.llm import (
+from snowland_agent_base.model import (
     DashScopeLLMBackend,
     LLMBackend,
     build_llm,

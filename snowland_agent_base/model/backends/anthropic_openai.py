@@ -25,7 +25,7 @@ SDK 访问: ``base_url="https://api.anthropic.com/v1"``, ``api_key`` 即 Anthrop
 """
 from __future__ import annotations
 
-from snowland_agent_base.llm.backends.openai_compat import (
+from snowland_agent_base.model.backends.openai_compat import (
     OpenAICompatLLMBackend,
 )
 

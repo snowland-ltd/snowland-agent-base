@@ -35,7 +35,7 @@ from typing import Dict, Optional
 from langchain_core.language_models import BaseChatModel
 
 from snowland_agent_base._compat import ensure_pydantic_v1_shim
-from snowland_agent_base.llm.base import LLMBackend
+from snowland_agent_base.model.base import LLMBackend
 from snowland_agent_base.messages import AnthropicMessage
 
 

@@ -26,7 +26,7 @@
 本模块只暴露**稳定的公共 API**(主入口门面 + 供扩展的抽象基类 + 消息模型)。
 具体后端实现与注册/工厂函数请从其子模块导入, 例如::
 
-    from snowland_agent_base.llm import DashScopeLLMBackend, register_llm_backend
+    from snowland_agent_base.model import DashScopeLLMBackend, register_llm_backend
     from snowland_agent_base.memory import ChromaMemoryBackend
     from snowland_agent_base.skill import FileSkillBackend, IdfSkillMatcher
 """
@@ -36,7 +36,7 @@
 from snowland_agent_base.agent import BaseAgent
 
 # ---- 大模型接入层 (门面 + 抽象基类) ----
-from snowland_agent_base.llm import LLMBackend, build_llm
+from snowland_agent_base.model import LLMBackend, build_llm
 
 # ---- 记忆层 (门面 + 抽象基类) ----
 from snowland_agent_base.memory import MemoryBackend, VectorMemory
@@ -111,4 +111,4 @@ except ImportError:  # pragma: no cover
     GraphAgent = None  # type: ignore[assignment]
 
 
-__version__ = "0.1"
+__version__ = "0.2"

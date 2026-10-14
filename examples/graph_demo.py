@@ -29,7 +29,7 @@ from langchain_dashscope import DashScopeEmbeddings
 from langgraph.checkpoint.sqlite import SqliteSaver
 
 from snowland_agent_base.graph import GraphAgent
-from snowland_agent_base.llm import build_llm
+from snowland_agent_base.model import build_llm
 
 
 def make_agent(thread_id: str) -> GraphAgent:

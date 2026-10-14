@@ -31,7 +31,7 @@ from pathlib import Path
 from langchain_dashscope import DashScopeEmbeddings
 
 from snowland_agent_base.agent import BaseAgent
-from snowland_agent_base.llm import build_llm
+from snowland_agent_base.model import build_llm
 from snowland_agent_base.skill import SkillRegistry, skill
 
 SKILLS_DIR = Path(__file__).parent / "skills"

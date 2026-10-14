@@ -37,8 +37,13 @@ import urllib.request
 from typing import Any, Dict, Optional
 from urllib.parse import urlencode
 
-from snowland_agent_base.llm.backends.openai_compat import (
+from snowland_agent_base.model.backends.openai_compat import (
+    OpenAICompatEmbeddingBackend,
+    OpenAICompatImageBackend,
     OpenAICompatLLMBackend,
+    OpenAICompatRerankBackend,
+    OpenAICompatTTSBackend,
+    OpenAICompatVideoBackend,
 )
 
 #: 合作伙伴推广码 (归因用). 见 OrcaRouter 合作伙伴仪表板.
@@ -62,7 +67,7 @@ class OrcaRouterLLMBackend(OpenAICompatLLMBackend):
     - ``orcarouter/auto``: 智能路由, 自动选最便宜的在线模型 (默认);
     - ``orcarouter/fusion-mini``: 命名路由器 (fusion 系列);
     - ``orcarouter/free``: 免费推理模型 (答案可能放在 ``reasoning_content``,
-      已由 :class:`~snowland_agent_base.llm.backends.openai_compat.ReasoningChatOpenAI`
+      已由 :class:`~snowland_agent_base.model.backends.openai_compat.ReasoningChatOpenAI`
       兼容处理)。
 
     可通过 ``extra_body={"models": [...]}`` (透传 kwargs) 设置 fallback 链。
@@ -98,6 +103,133 @@ class OrcaRouterLLMBackend(OpenAICompatLLMBackend):
             temperature=temperature,
             max_tokens=max_tokens,
             top_p=top_p,
+            **kwargs,
+        )
+
+
+class _OrcaRouterBackendMixin:
+    """OrcaRouter OpenAI 兼容后端的共享配置。
+
+    统一复用 OrcaRouter 网关地址 ``https://api.orcarouter.ai/v1`` 与 API Key
+    解析 (``ORCA_KEY`` 优先, 回退 ``ORCAROUTER_API_KEY``)。
+    """
+
+    #: OrcaRouter OpenAI 兼容接口地址。
+    default_base_url = "https://api.orcarouter.ai/v1"
+    #: API Key 环境变量 (对齐 OrcaRouter provider 配置 ``env_key``)。
+    api_key_env = ORCA_KEY_ENV
+    #: base_url 环境变量。
+    base_url_env = "ORCAROUTER_BASE_URL"
+
+    def _orca_key(self, api_key: Optional[str]) -> Optional[str]:
+        """解析 OrcaRouter API Key: 构造参数 > ``ORCA_KEY`` > ``ORCAROUTER_API_KEY``。"""
+        return api_key or os.getenv(ORCA_KEY_ENV) or os.getenv(ORCAROUTER_API_KEY_ENV)
+
+
+class OrcaRouterEmbeddingBackend(_OrcaRouterBackendMixin, OpenAICompatEmbeddingBackend):
+    """OrcaRouter 向量后端 (OpenAI 兼容 ``/embeddings``)。"""
+
+    default_model = "text-embedding-3-small"
+
+    def __init__(
+        self,
+        model: Optional[str] = None,
+        api_key: Optional[str] = None,
+        base_url: Optional[str] = None,
+        **kwargs: Any,
+    ) -> None:
+        super().__init__(
+            model=model,
+            api_key=self._orca_key(api_key),
+            base_url=base_url,
+            **kwargs,
+        )
+
+
+class OrcaRouterImageBackend(_OrcaRouterBackendMixin, OpenAICompatImageBackend):
+    """OrcaRouter 图像生成后端 (OpenAI 兼容 ``/images/generations``)。"""
+
+    default_model = "dall-e-3"
+
+    def __init__(
+        self,
+        model: Optional[str] = None,
+        api_key: Optional[str] = None,
+        base_url: Optional[str] = None,
+        n: int = 1,
+        size: Optional[str] = None,
+        **kwargs: Any,
+    ) -> None:
+        super().__init__(
+            model=model,
+            api_key=self._orca_key(api_key),
+            base_url=base_url,
+            n=n,
+            size=size,
+            **kwargs,
+        )
+
+
+class OrcaRouterVideoBackend(_OrcaRouterBackendMixin, OpenAICompatVideoBackend):
+    """OrcaRouter 视频生成后端 (OpenAI 兼容 ``/videos/generations``)。"""
+
+    default_model = "video"
+
+    def __init__(
+        self,
+        model: Optional[str] = None,
+        api_key: Optional[str] = None,
+        base_url: Optional[str] = None,
+        **kwargs: Any,
+    ) -> None:
+        super().__init__(
+            model=model,
+            api_key=self._orca_key(api_key),
+            base_url=base_url,
+            **kwargs,
+        )
+
+
+class OrcaRouterTTSBackend(_OrcaRouterBackendMixin, OpenAICompatTTSBackend):
+    """OrcaRouter 语音合成后端 (OpenAI 兼容 ``/audio/speech``)。"""
+
+    default_model = "tts-1"
+
+    def __init__(
+        self,
+        model: Optional[str] = None,
+        api_key: Optional[str] = None,
+        base_url: Optional[str] = None,
+        voice: str = "alloy",
+        **kwargs: Any,
+    ) -> None:
+        super().__init__(
+            model=model,
+            api_key=self._orca_key(api_key),
+            base_url=base_url,
+            voice=voice,
+            **kwargs,
+        )
+
+
+class OrcaRouterRerankBackend(_OrcaRouterBackendMixin, OpenAICompatRerankBackend):
+    """OrcaRouter 语义重排后端 (OpenAI 兼容 ``/rerank``)。"""
+
+    default_model = "rerank"
+
+    def __init__(
+        self,
+        model: Optional[str] = None,
+        api_key: Optional[str] = None,
+        base_url: Optional[str] = None,
+        top_n: int = 5,
+        **kwargs: Any,
+    ) -> None:
+        super().__init__(
+            model=model,
+            api_key=self._orca_key(api_key),
+            base_url=base_url,
+            top_n=top_n,
             **kwargs,
         )
 

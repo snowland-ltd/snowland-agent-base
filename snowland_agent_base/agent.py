@@ -36,7 +36,7 @@ from snowland_agent_base.messages import (
     tool_message,
     user_message,
 )
-from snowland_agent_base.llm.registry import get_message_class
+from snowland_agent_base.model.registry import get_message_class
 from snowland_agent_base.perception import PerceptionLayer, PerceptionBackend
 from snowland_agent_base.skill import Skill, SkillRegistry
 
@@ -73,7 +73,7 @@ class BaseAgent:
         """初始化 Agent。
 
         Args:
-            llm: LangChain ChatModel (参见 :func:`snowland_agent_base.llm.build_llm`)。
+            llm: LangChain ChatModel (参见 :func:`snowland_agent_base.model.build_llm`)。
             embedding: Embeddings 实例, 开启记忆时必需。
             perception: 感知层, 缺省自动构建。
             decision: 决策层, 缺省基于 ``llm`` 构建 (此时 ``system_prompt`` 生效)。

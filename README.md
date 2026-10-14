@@ -85,7 +85,7 @@ from langchain_dashscope import DashScopeEmbeddings
 
 from snowland_agent_base.agent import BaseAgent
 from snowland_agent_base.decision import AgentAction, Rule
-from snowland_agent_base.llm import build_llm
+from snowland_agent_base.model import build_llm
 
 llm = build_llm(model="qwen-plus")
 agent = BaseAgent(
@@ -110,15 +110,69 @@ print(result["answer"])
 
 Full example: `examples/quickstart.py`.
 
-## OrcaRouter (LLM Backend)
+## Model Backend (Pluggable)
 
-snowland-agent-base integrates [OrcaRouter](https://www.orcarouter.ai/) — an
-OpenAI-compatible LLM routing gateway — as a pluggable backend. It routes across
-OpenAI, Anthropic, Gemini, DeepSeek, Qwen and more, with smart routing and
-fallback chains.
+The model layer is **pluggable by capability type**. A backend is addressed by two
+orthogonal dimensions:
+
+- **Vendor** (`dashscope` / `orcarouter` / `zhipu` / `deepseek` / `anthropic` / `anthropic-openai` / `openai-compat`)
+- **Capability** (`ModelType`: reasoning / embedding / image / video / tts / rerank)
+
+Every backend derives from a unified root `ModelBackend` and branches into six
+same-shaped interfaces (`LLMBackend` / `EmbeddingBackend` / `ImageBackend` /
+`VideoBackend` / `TTSBackend` / `RerankBackend`), so callers depend only on the
+abstract capability, never on the concrete vendor.
+
+### Facade functions
 
 ```python
-from snowland_agent_base.llm import build_llm
+from snowland_agent_base.model import (
+    build_llm, build_embedding, build_image, build_video, build_tts, build_rerank,
+)
+
+chat   = build_llm(model="qwen-plus")                       # BaseChatModel
+emb    = build_embedding(backend="orcarouter")              # Embeddings
+img    = build_image(backend="orcarouter").generate("a cat")      # ImageResult
+video  = build_video(backend="dashscope").generate("waves")       # VideoResult
+audio  = build_tts(backend="dashscope", voice="alex").synthesize("hello")  # AudioResult
+reranker = build_rerank(backend="dashscope")                # RerankModel
+ranked   = reranker.rerank(query="...", documents=[...])    # RerankResult
+```
+
+### AutoBackend — one object, all capabilities
+
+`AutoBackend` holds a default vendor and exposes every capability as a method, so you
+never repeat the backend name:
+
+```python
+from snowland_agent_base.model import AutoBackend
+
+backend = AutoBackend(vendor="dashscope")
+chat  = backend.reasoning(model="qwen-plus")
+emb   = backend.embedding()
+img   = backend.image(model="wanx-v1").generate("a cat")
+video = backend.video(model="wanx-v1").generate("waves")
+audio = backend.tts(model="cosyvoice-v1").synthesize("你好")
+rank  = backend.rerank(query="...", documents=[...])   # directly returns RerankResult
+```
+
+### Supported vendors
+
+| Vendor | Env vars (key / base_url) | Capabilities |
+| --- | --- | --- |
+| `dashscope` (default) | `DASHSCOPE_API_KEY` | **reasoning, embedding, image, video, tts, rerank** (all 6) |
+| `orcarouter` | `ORCA_KEY` (or `ORCAROUTER_API_KEY`) / `ORCAROUTER_BASE_URL` | **reasoning, embedding, image, video, tts, rerank** (all 6) |
+| `zhipu` | `ZHIPU_API_KEY` / `ZHIPU_BASE_URL` | reasoning, embedding, image, video, tts, rerank (all 6) |
+| `deepseek` | `DEEPSEEK_API_KEY` / `DEEPSEEK_BASE_URL` | reasoning, embedding, rerank |
+| `anthropic` | `ANTHROPIC_API_KEY` / `ANTHROPIC_BASE_URL` | reasoning (native Messages API) |
+| `anthropic-openai` | `OPENAI_API_KEY` | reasoning (Anthropic via OpenAI-compatible) |
+| `openai-compat` | `OPENAI_API_KEY` / `OPENAI_BASE_URL` | reasoning, embedding, image, video, tts, rerank (generic fallback) |
+
+OrcaRouter is an OpenAI-compatible routing gateway that fans out to OpenAI, Anthropic,
+Gemini, DeepSeek, Qwen and more, with smart routing and fallback chains:
+
+```python
+from snowland_agent_base.model import build_llm
 
 llm = build_llm(backend="orcarouter", model="orcarouter/auto")
 ```
@@ -130,6 +184,22 @@ If you find this project useful, sign up for OrcaRouter through our referral lin
 new accounts are attributed to us at no extra cost to you:
 
 https://www.orcarouter.ai/ref/ref_808b7e19b052dee31192
+
+### Custom backend
+
+Add a vendor by subclassing the matching capability interface and registering it:
+
+```python
+from snowland_agent_base.model import register_llm_backend, ModelType
+from snowland_agent_base.model.backends.openai_compat import OpenAICompatLLMBackend
+
+class MyLLMBackend(OpenAICompatLLMBackend):
+    default_base_url = "https://my.api/v1"
+    api_key_env = "MY_API_KEY"
+
+register_llm_backend("myvendor", MyLLMBackend)
+register_llm_backend("myvendor", MyOtherBackend, ModelType.EMBEDDING)
+```
 
 ## Message Model
 

@@ -19,8 +19,10 @@
 """
 from __future__ import annotations
 
-from snowland_agent_base.llm.backends.openai_compat import (
+from snowland_agent_base.model.backends.openai_compat import (
+    OpenAICompatEmbeddingBackend,
     OpenAICompatLLMBackend,
+    OpenAICompatRerankBackend,
 )
 
 
@@ -31,3 +33,21 @@ class DeepSeekLLMBackend(OpenAICompatLLMBackend):
     api_key_env = "DEEPSEEK_API_KEY"
     base_url_env = "DEEPSEEK_BASE_URL"
     default_model = "deepseek-chat"
+
+
+class DeepSeekEmbeddingBackend(OpenAICompatEmbeddingBackend):
+    """DeepSeek 向量后端 (OpenAI 兼容 ``/embeddings``)。"""
+
+    default_base_url = "https://api.deepseek.com/v1"
+    api_key_env = "DEEPSEEK_API_KEY"
+    base_url_env = "DEEPSEEK_BASE_URL"
+    default_model = "deepseek-embedding"
+
+
+class DeepSeekRerankBackend(OpenAICompatRerankBackend):
+    """DeepSeek 语义重排后端 (OpenAI 兼容 ``/rerank``, 模型 ``deepseek-rerank``)。"""
+
+    default_base_url = "https://api.deepseek.com/v1"
+    api_key_env = "DEEPSEEK_API_KEY"
+    base_url_env = "DEEPSEEK_BASE_URL"
+    default_model = "deepseek-rerank"

@@ -28,7 +28,7 @@ from langchain_dashscope import DashScopeEmbeddings
 from snowland_agent_base.agent import BaseAgent
 from snowland_agent_base.decision import AgentAction, Rule
 from snowland_agent_base.execution import build_http_client, request_json
-from snowland_agent_base.llm import build_llm
+from snowland_agent_base.model import build_llm
 
 
 def make_weather_tool():

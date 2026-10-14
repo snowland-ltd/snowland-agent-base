@@ -80,7 +80,7 @@ from langchain_dashscope import DashScopeEmbeddings
 
 from snowland_agent_base.agent import BaseAgent
 from snowland_agent_base.decision import AgentAction, Rule
-from snowland_agent_base.llm import build_llm
+from snowland_agent_base.model import build_llm
 
 llm = build_llm(model="qwen-plus")
 agent = BaseAgent(
@@ -105,12 +105,63 @@ print(result["answer"])
 
 完整示例见 `examples/quickstart.py`。
 
-## OrcaRouter（大模型后端）
+## 模型后端（可插拔）
 
-snowland-agent-base 集成了 [OrcaRouter](https://www.orcarouter.ai/) —— 一个 OpenAI 兼容的大模型路由网关 —— 作为可插拔后端。它可在 OpenAI、Anthropic、Gemini、DeepSeek、Qwen 等模型间路由，支持智能路由与 fallback 链。
+模型层按**能力类型**可插拔。一个后端由两条正交维度定位：
+
+- **厂商**（vendor）：`dashscope` / `orcarouter` / `zhipu` / `deepseek` / `anthropic` / `anthropic-openai` / `openai-compat`
+- **能力**（capability）：`ModelType`：推理 / 向量 / 图像 / 视频 / 语音 / 重排
+
+所有后端继承自统一抽象根 `ModelBackend`，并派生出六种同形态接口（`LLMBackend` / `EmbeddingBackend` / `ImageBackend` / `VideoBackend` / `TTSBackend` / `RerankBackend`），调用方只依赖抽象能力，不感知具体厂商。
+
+### 门面函数
 
 ```python
-from snowland_agent_base.llm import build_llm
+from snowland_agent_base.model import (
+    build_llm, build_embedding, build_image, build_video, build_tts, build_rerank,
+)
+
+chat   = build_llm(model="qwen-plus")                           # BaseChatModel
+emb    = build_embedding(backend="orcarouter")                  # Embeddings
+img    = build_image(backend="orcarouter").generate("一只猫")     # ImageResult
+video  = build_video(backend="dashscope").generate("海浪")         # VideoResult
+audio  = build_tts(backend="dashscope", voice="alex").synthesize("你好")  # AudioResult
+reranker = build_rerank(backend="dashscope")                    # RerankModel
+ranked   = reranker.rerank(query="...", documents=[...])        # RerankResult
+```
+
+### AutoBackend —— 一个对象，调全部能力
+
+`AutoBackend` 持有一个默认厂商，把各能力作为方法暴露，无需每个调用都重复写 backend：
+
+```python
+from snowland_agent_base.model import AutoBackend
+
+backend = AutoBackend(vendor="dashscope")
+chat  = backend.reasoning(model="qwen-plus")
+emb   = backend.embedding()
+img   = backend.image(model="wanx-v1").generate("一只猫")
+video = backend.video(model="wanx-v1").generate("海浪")
+audio = backend.tts(model="cosyvoice-v1").synthesize("你好")
+rank  = backend.rerank(query="...", documents=[...])   # 直接返回 RerankResult
+```
+
+### 支持的厂商
+
+| 厂商 | 环境变量（key / base_url） | 能力 |
+| --- | --- | --- |
+| `dashscope`（默认） | `DASHSCOPE_API_KEY` | **推理、向量、图像、视频、语音、重排**（全 6 类） |
+| `orcarouter` | `ORCA_KEY`（或 `ORCAROUTER_API_KEY`）/ `ORCAROUTER_BASE_URL` | **推理、向量、图像、视频、语音、重排**（全 6 类） |
+| `zhipu` | `ZHIPU_API_KEY` / `ZHIPU_BASE_URL` | 推理、向量、图像、视频、语音、重排（全 6 类） |
+| `deepseek` | `DEEPSEEK_API_KEY` / `DEEPSEEK_BASE_URL` | 推理、向量、重排 |
+| `anthropic` | `ANTHROPIC_API_KEY` / `ANTHROPIC_BASE_URL` | 推理（原生 Messages API） |
+| `anthropic-openai` | `OPENAI_API_KEY` | 推理（Anthropic 走 OpenAI 兼容） |
+| `openai-compat` | `OPENAI_API_KEY` / `OPENAI_BASE_URL` | 推理、向量、图像、视频、语音、重排（通用兜底） |
+
+OrcaRouter 是一个 OpenAI 兼容的路由网关，可在 OpenAI、Anthropic、Gemini、DeepSeek、Qwen 等模型间路由，支持智能路由与 fallback 链：
+
+```python
+from snowland_agent_base.model import build_llm
 
 llm = build_llm(backend="orcarouter", model="orcarouter/auto")
 ```
@@ -120,6 +171,22 @@ llm = build_llm(backend="orcarouter", model="orcarouter/auto")
 如果你觉得本项目有用，可以通过我们的推广链接注册 OrcaRouter —— 新账户会自动归因到我们，对你没有任何额外成本：
 
 https://www.orcarouter.ai/ref/ref_808b7e19b052dee31192
+
+### 自定义后端
+
+继承对应能力接口并注册即可新增厂商：
+
+```python
+from snowland_agent_base.model import register_llm_backend, ModelType
+from snowland_agent_base.model.backends.openai_compat import OpenAICompatLLMBackend
+
+class MyLLMBackend(OpenAICompatLLMBackend):
+    default_base_url = "https://my.api/v1"
+    api_key_env = "MY_API_KEY"
+
+register_llm_backend("myvendor", MyLLMBackend)
+register_llm_backend("myvendor", MyOtherBackend, ModelType.EMBEDDING)
+```
 
 ## 消息模型
 
