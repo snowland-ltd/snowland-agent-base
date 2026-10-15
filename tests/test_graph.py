@@ -156,12 +156,12 @@ class TestHistoryInput(unittest.TestCase):
         """不传 history 时行为不变。"""
         self.llm.responses = ['{"thought": "t", "final_answer": "ok"}']
         result = self.agent.invoke("你好", thread_id="h-5")
-        self.assertEqual([m["content"] for m in result["messages"]], ["你好", "ok"])
+        self.assertEqual([m.content for m in result["messages"]], ["你好", "ok"])
 
     def test_run_accepts_history(self):
         self.llm.responses = ['{"thought": "t", "final_answer": "ok"}']
         result = self.agent.run("Q", thread_id="h-6", history=[{"role": "user", "content": "旧"}])
-        self.assertIn("旧", [m["content"] for m in result["messages"]])
+        self.assertIn("旧", [m.content for m in result["messages"]])
 
     def test_stream_accepts_history(self):
         self.llm.responses = ['{"thought": "t", "final_answer": "ok"}']
@@ -171,7 +171,7 @@ class TestHistoryInput(unittest.TestCase):
                 history=[{"role": "user", "content": "旧"}],
             )
         )
-        self.assertIn("旧", [m["content"] for m in chunks[-1]["messages"]])
+        self.assertIn("旧", [m.content for m in chunks[-1]["messages"]])
 
     def test_history_helper_constructors(self):
         """支持用辅助函数构造历史。"""

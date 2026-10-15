@@ -33,6 +33,7 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Sequence, Union
 
 
@@ -43,26 +44,30 @@ ROLE_ASSISTANT = "assistant"
 ROLE_TOOL = "tool"
 
 
+@dataclass
 class Message(ABC):
     """消息统一抽象: 持有通用字段, 子类负责转换为具体厂商格式。
 
     子类只需实现 :meth:`to_langchain_messages`; 二者方法签名一致,
     因此决策层 / Agent 层无需感知当前是 OpenAI 还是 Anthropic 后端。
+
+    采用 ``@dataclass`` 是为了让 LangGraph 的 checkpointer (msgpack 序列化) 能
+    自动 (反)序列化消息对象: ``langgraph`` 对 dataclass 有原生编解码分支, 会按
+    字段存 ``(__module__, __name__, {字段})`` 并在读取时 ``cls(**字段)`` 重建。
+    若不如此, 自定义 ``Message`` 无法被 msgpack 序列化, 会导致图状态持久化时报
+    ``TypeError: Type is not msgpack serializable``。
     """
 
-    def __init__(
-        self,
-        role: str,
-        content: str,
-        name: Optional[str] = None,
-        tool_call_id: Optional[str] = None,
-        tool_calls: Optional[List[Dict[str, Any]]] = None,
-    ) -> None:
-        self.role = role
-        self.content = content
-        self.name = name
-        self.tool_call_id = tool_call_id
-        self.tool_calls = tool_calls
+    #: 角色 (system / user / assistant / tool)
+    role: str
+    #: 文本内容
+    content: str
+    #: 可选: 工具名 / 发言人名
+    name: Optional[str] = None
+    #: 可选: 工具调用 id (配合 tool_calls 使用)
+    tool_call_id: Optional[str] = None
+    #: 可选: 工具调用列表 (Anthropic 原生 tool use)
+    tool_calls: Optional[List[Dict[str, Any]]] = None
 
     @abstractmethod
     def to_langchain_messages(self) -> List[Any]:
@@ -94,30 +99,6 @@ class Message(ABC):
             name=data.get("name"),
             tool_call_id=data.get("tool_call_id"),
             tool_calls=data.get("tool_calls"),
-        )
-
-    def __eq__(self, other: object) -> bool:
-        if not isinstance(other, Message):
-            return NotImplemented
-        return (
-            self.role,
-            self.content,
-            self.name,
-            self.tool_call_id,
-            self.tool_calls,
-        ) == (
-            other.role,
-            other.content,
-            other.name,
-            other.tool_call_id,
-            other.tool_calls,
-        )
-
-    def __repr__(self) -> str:
-        return (
-            f"{type(self).__name__}(role={self.role!r}, content={self.content!r}, "
-            f"name={self.name!r}, tool_call_id={self.tool_call_id!r}, "
-            f"tool_calls={self.tool_calls!r})"
         )
 
 
