@@ -188,6 +188,25 @@ register_llm_backend("myvendor", MyLLMBackend)
 register_llm_backend("myvendor", MyOtherBackend, ModelType.EMBEDDING)
 ```
 
+### ChatModel 代理（懒加载 / 空响应重试）
+
+代理模块提供两个 `BaseChatModel` 装饰器，包裹已有的 ChatModel（如 `build_llm` 返回的对象），对调用方完全透明——可在任何需要 ChatModel 的地方直接替换使用：
+
+- `LazyChatModel(builder=...)`：延迟到底层 LLM 的首次真正调用时才构造。适合不想让每个 Agent 在构造期就拉起 ChatModel 的场景。构造过程采用双重检查 + 加锁，可安全地在并行任务间共享同一实例。
+- `RetryOnEmptyChatModel(inner=..., max_retries=2)`：当底层模型返回空 `content`（推理模型把额度花在 `reasoning_content` 上、撞满后一个 token 都不剩）时自动重试。正常模型永不触发重试，零额外开销。
+
+```python
+from snowland_agent_base.model import build_llm, LazyChatModel, RetryOnEmptyChatModel
+
+# 懒加载 + 重试组合：仅在首次使用时构建 LLM，并对空响应自愈
+llm = RetryOnEmptyChatModel(
+    inner=LazyChatModel(builder=lambda: build_llm(model="qwen-plus")),
+)
+agent = BaseAgent(llm=llm, ...)
+```
+
+`BaseAgent` 默认就开启了这一能力：它会用 `RetryOnEmptyChatModel` 自动包裹 LLM（`enable_retry=True`、`retry_max_retries=2`）。若你传入的是 `LazyChatModel`，Agent 会在外层再包一层重试，同时获得「懒加载 + 重试」。
+
 ## 消息模型
 
 历史会话与 Agent 输出均使用 **消息列表**（`List[Message]`），而非拼接的字符串 —— 这样能保留角色结构，便于持久化、多轮对话和前端渲染。
@@ -386,6 +405,31 @@ agent.add_subgraph("translator", translator_agent.build())
 - 记忆层（Chroma 不可用）→ 检索/写入忽略，退化为无记忆模式。
 - 决策层（LLM 异常或返回非法 JSON）→ 重试后回退 `fallback_answer`。
 - 执行层（工具抛错/超时）→ 指数退避重试，最终收敛为 `success=False` 的观测结果。
+
+## 并发执行
+
+对于「无共享状态任务」扇出，使用 `snowland_agent_base.parallel` 中的线程池工具：
+
+- `map_parallel(fn, items, max_workers=None, catch_errors=True)`：把 `fn` 并发映射到 `items`，返回与 `items` **顺序一致**的结果列表。`max_workers <= 1` 或只有一个元素时自动退化为串行。
+- `run_parallel(tasks, max_workers=None, catch_errors=True)`：并发执行一批**命名任务**（`{name: callable}`），返回 `{name: result}`。
+
+默认每个任务的异常都会被捕获并转换为 `{"success": False, "error": str(e), ...}`，单个任务失败不会中断整体；传 `catch_errors=False` 则首个异常原样抛出。
+
+```python
+from snowland_agent_base import map_parallel, run_parallel
+
+# 批量同构任务，顺序保持一致
+summaries = map_parallel(summarize, documents)
+
+# 命名并行步骤
+out = run_parallel({
+    "frontend": lambda: build_ui(...),
+    "backend":  lambda: build_api(...),
+})
+ui, api = out["frontend"], out["backend"]
+```
+
+当多个任务共用同一个 LLM 时，用 `LazyChatModel` 包裹，可让底层 ChatModel 只构建一次并在多线程间安全复用。
 
 ## 测试
 

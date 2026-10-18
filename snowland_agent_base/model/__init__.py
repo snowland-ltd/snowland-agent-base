@@ -122,11 +122,17 @@ from snowland_agent_base.model.registry import (
     list_llm_backends,
     register_llm_backend,
 )
+from snowland_agent_base.model.proxy import (
+    LazyChatModel,
+    RetryOnEmptyChatModel,
+)
 from snowland_agent_base.model.types import ModelType
 
 
 __all__ = [
     "ModelType",
+    "LazyChatModel",
+    "RetryOnEmptyChatModel",
     "ModelBackend",
     "LLMBackend",
     "EmbeddingBackend",

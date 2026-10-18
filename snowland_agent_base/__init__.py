@@ -34,6 +34,8 @@
 
 # ---- 主入口 / 代理 ----
 from snowland_agent_base.agent import BaseAgent
+from snowland_agent_base.model import LazyChatModel, RetryOnEmptyChatModel
+from snowland_agent_base.parallel import map_parallel, run_parallel
 
 # ---- 大模型接入层 (门面 + 抽象基类) ----
 from snowland_agent_base.model import LLMBackend, build_llm
@@ -75,6 +77,10 @@ __all__ = [
     # llm
     "build_llm",
     "LLMBackend",
+    "LazyChatModel",
+    "RetryOnEmptyChatModel",
+    "run_parallel",
+    "map_parallel",
     # memory
     "VectorMemory",
     "MemoryBackend",
@@ -111,4 +117,4 @@ except ImportError:  # pragma: no cover
     GraphAgent = None  # type: ignore[assignment]
 
 
-__version__ = "0.2"
+__version__ = "0.2.1"

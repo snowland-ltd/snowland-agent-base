@@ -36,6 +36,7 @@ from snowland_agent_base.messages import (
     tool_message,
     user_message,
 )
+from snowland_agent_base.model import LazyChatModel, RetryOnEmptyChatModel
 from snowland_agent_base.model.registry import get_message_class
 from snowland_agent_base.perception import PerceptionLayer, PerceptionBackend
 from snowland_agent_base.skill import Skill, SkillRegistry
@@ -69,6 +70,8 @@ class BaseAgent:
         skills: Optional[SkillRegistry] = None,
         auto_activate_skills: bool = True,
         backend: Optional[str] = None,
+        enable_retry: bool = True,
+        retry_max_retries: int = 2,
     ) -> None:
         """初始化 Agent。
 
@@ -88,7 +91,18 @@ class BaseAgent:
             skills: skill 注册表 (见 :mod:`snowland_agent_base.skill`)。
             auto_activate_skills: 是否按输入自动激活相关 skill (词面粗筛)。
                 关闭后仅注入 skill 目录, 由 LLM 自行判断是否使用。
+            enable_retry: 是否给 LLM 包一层「空 content 自愈重试」代理 (默认开)。
+                所有 Agent 默认获得与业务层一致的空响应自愈能力; 正常模型零额外开销,
+                推理模型撞满额度返回空 content 时自动重试。传入的 llm 若是代理本身则
+                跳过以避免重复包裹; 若传入 :class:`LazyChatModel`, 则在外层再包一层
+                重试, 同时具备「懒加载 + 重试」。
+            retry_max_retries: 空 content 重试次数 (不含首次), 默认 2。
         """
+        # 统一空响应自愈重试: 让所有 Agent 默认具备与业务层一致的「空 content 自动重试」
+        # 能力。传入的 llm 若是 RetryOnEmptyChatModel 本身则跳过, 避免重复包裹; 若传入
+        # LazyChatModel, 则在外层再包一层重试, 同时获得「懒加载 + 重试」。
+        if enable_retry and not isinstance(llm, RetryOnEmptyChatModel):
+            llm = RetryOnEmptyChatModel(inner=llm, max_retries=retry_max_retries)
         self.llm = llm
         self.max_steps = max_steps
         self.use_perception = use_perception

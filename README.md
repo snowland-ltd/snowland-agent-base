@@ -201,6 +201,37 @@ register_llm_backend("myvendor", MyLLMBackend)
 register_llm_backend("myvendor", MyOtherBackend, ModelType.EMBEDDING)
 ```
 
+### ChatModel proxies (lazy load / empty-response retry)
+
+The proxy module provides two `BaseChatModel` decorators that wrap an existing
+ChatModel (such as the one returned by `build_llm`) and transparently add
+behavior — they can be used as drop-in replacements anywhere a ChatModel is
+expected:
+
+- `LazyChatModel(builder=...)` — defers construction of the underlying LLM until
+  the first real call. Handy when you do not want every Agent to spin up a
+  ChatModel at construction time. Construction is double-checked and lock-guarded,
+  so a single instance is safe to share across parallel tasks.
+- `RetryOnEmptyChatModel(inner=..., max_retries=2)` — when the underlying model
+  returns an empty `content` (a reasoning model that spent its budget on
+  `reasoning_content`), it retries automatically. Normal models never trigger a
+  retry, so there is zero overhead for them.
+
+```python
+from snowland_agent_base.model import build_llm, LazyChatModel, RetryOnEmptyChatModel
+
+# Lazy + retry combined: build the LLM only on first use, and self-heal empty responses
+llm = RetryOnEmptyChatModel(
+    inner=LazyChatModel(builder=lambda: build_llm(model="qwen-plus")),
+)
+agent = BaseAgent(llm=llm, ...)
+```
+
+`BaseAgent` enables this automatically: it wraps the LLM with
+`RetryOnEmptyChatModel` by default (`enable_retry=True`, `retry_max_retries=2`).
+If you pass a `LazyChatModel`, the agent adds the retry layer on top, giving you
+both lazy loading and self-healing for free.
+
 ## Message Model
 
 Both conversation history and Agent output use a **message list** (`List[Message]`)
@@ -421,6 +452,38 @@ Failures at any layer do not block the main flow and degrade automatically:
 - Memory layer (Chroma unavailable) → retrieval/writing ignored, degrades to memory-less mode.
 - Decision layer (LLM exception or invalid JSON) → retry then fall back to `fallback_answer`.
 - Execution layer (tool throws/times out) → exponential backoff retry, eventually converging to an observation with `success=False`.
+
+## Parallel Execution
+
+For fanning out independent, shared-nothing tasks, use the thread-pool helpers in
+`snowland_agent_base.parallel`:
+
+- `map_parallel(fn, items, max_workers=None, catch_errors=True)` — apply `fn` to
+  each item concurrently and return a list **in the same order** as `items`.
+  Auto-degrades to serial when `max_workers <= 1` or there is only a single item.
+- `run_parallel(tasks, max_workers=None, catch_errors=True)` — run a dict of
+  **named** tasks (`{name: callable}`) concurrently and return `{name: result}`.
+
+By default each task's exception is caught and converted to
+`{"success": False, "error": str(e), ...}` so one failure does not abort the whole
+batch; pass `catch_errors=False` to raise on the first error.
+
+```python
+from snowland_agent_base import map_parallel, run_parallel
+
+# batch homogeneous tasks, order preserved
+summaries = map_parallel(summarize, documents)
+
+# named parallel steps
+out = run_parallel({
+    "frontend": lambda: build_ui(...),
+    "backend":  lambda: build_api(...),
+})
+ui, api = out["frontend"], out["backend"]
+```
+
+When tasks share an LLM, wrap it with `LazyChatModel` so the underlying ChatModel
+is built once and safely reused across threads.
 
 ## Testing
 
